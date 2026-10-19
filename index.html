@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Veille appels d'offres</title>
 <!--
-  Page de suivi des annonces BOAMP retenues par la pipeline.
+  Page de suivi des annonces retenues par la pipeline, un onglet par source :
+  BOAMP (table annonces_boamp) et TED (table annonces_ted). Chaque source est
+  décrite dans SOURCES (table, colonnes, cellules propres) ; le reste est commun.
 
-  Lit directement la table annonces_boamp dans Supabase (aucune régénération
-  quotidienne) : annonces marquées `rapporte` dont la note LLM est absente ou
-  strictement positive, plus celles déjà notées par l'équipe, même si elles ne
-  passent plus le filtre.
+  Lit directement les tables dans Supabase (aucune régénération quotidienne) :
+  annonces marquées `rapporte` dont la note LLM est absente ou strictement
+  positive, plus celles déjà notées par l'équipe, même si elles ne passent plus
+  le filtre.
   Seules les colonnes `vue` et `note_humaine` sont modifiables depuis la page
   (droits par colonne + RLS côté Supabase, rôle authenticated uniquement).
 
@@ -27,6 +29,15 @@
   .sous-titre { color: #6e6e73; margin-bottom: 16px; font-size: 14px; }
   .nouveautes { font-size: 15px; margin: 8px 0 4px; }
   .utilisateur { font-size: 13px; color: #6e6e73; }
+
+  /* Onglets */
+  .onglets { display: flex; gap: 4px; margin: 16px 0 4px; border-bottom: 1px solid #d2d2d7; }
+  .onglets button {
+    border: none; border-bottom: 2px solid transparent; border-radius: 0;
+    background: none; padding: 8px 14px; font-size: 14px; color: #6e6e73;
+  }
+  .onglets button:hover { background: none; color: #1d1d1f; }
+  .onglets button[aria-selected="true"] { color: #1d1d1f; border-bottom-color: #1d1d1f; font-weight: 600; }
   button {
     font: inherit; font-size: 13px; cursor: pointer; border: 1px solid #d2d2d7;
     background: #fff; border-radius: 8px; padding: 5px 12px; color: #1d1d1f;
@@ -112,6 +123,10 @@
     <h1>Veille appels d'offres — reciproque</h1>
     <div class="utilisateur"><span id="email-utilisateur"></span> · <button id="deconnexion" type="button">Se déconnecter</button></div>
   </div>
+  <div class="onglets" role="tablist">
+    <button type="button" role="tab" data-source="boamp">BOAMP (France)</button>
+    <button type="button" role="tab" data-source="ted">TED (Europe)</button>
+  </div>
   <div class="nouveautes" id="nouveautes"></div>
   <div class="sous-titre" id="compteur">Chargement…</div>
 
@@ -124,20 +139,7 @@
 
   <div class="conteneur-tableau">
     <table>
-      <thead>
-        <tr>
-          <th>Acheteur</th>
-          <th class="col-objet">Objet</th>
-          <th>Descripteurs</th>
-          <th>Marché</th>
-          <th>Dates</th>
-          <th>Proximité sémantique</th>
-          <th class="col-analyse">Analyse LLM</th>
-          <th>Évaluation</th>
-          <th>Avis</th>
-          <th>Vue</th>
-        </tr>
-      </thead>
+      <thead><tr id="entetes"></tr></thead>
       <tbody id="lignes"></tbody>
     </table>
   </div>
@@ -148,7 +150,8 @@
 const SUPABASE_URL = "https://ebwifdmbdialwdsplhsl.supabase.co";
 const SUPABASE_CLE_PUBLIQUE = "sb_publishable_PTTFRwEG-DEVQZYMbWqxaQ_kH6pDJda";
 
-// Même correspondance que rapport.COULEURS_TAGS : à garder synchronisée.
+// Colonnes match_* de tagging.CLUSTERS (présentes dans les deux tables) :
+// libellé et couleur du badge. À garder synchronisé avec tagging.CLUSTERS.
 const COULEURS_TAGS = {
   match_prestations: ["Prestations", "#42a016"],
   match_numerique_multimedia: ["Numérique / Multimédia", "#1e65b5"],
@@ -157,18 +160,17 @@ const COULEURS_TAGS = {
   match_institutions: ["Institutions", "#931cae"],
 };
 
-const COLONNES = [
-  "idweb", "objet", "nomacheteur", "code_departement", "dateparution",
-  "datelimitereponse", "famille_libelle", "descripteur_libelle",
+// Colonnes lues dans les deux tables.
+const COLONNES_COMMUNES = [
+  "idweb", "objet", "nomacheteur", "dateparution", "datelimitereponse",
   "procedure_libelle", "url_avis", "score_similarite", "total_poles",
   "analyse_pertinence", "analyse_note", "vue", "note_humaine",
   "annotation_par", "annotation_le", ...Object.keys(COULEURS_TAGS),
-].join(",");
+];
 
 const TAILLE_PAGE = 1000; // limite par défaut de l'API Supabase
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_CLE_PUBLIQUE);
-let annonces = [];
 
 const $ = (id) => document.getElementById(id);
 
@@ -185,8 +187,15 @@ function el(balise, proprietes = {}, enfants = []) {
 
 const tiret = () => el("span", { className: "vide", textContent: "—" });
 
+const DATE_SEULE = /^\d{4}-\d{2}-\d{2}$/;
+
 function formaterDate(valeur, avecHeure = false) {
   if (!valeur) return "";
+  // Date sans heure (AAAA-MM-JJ) : lue en heure locale, affichée sans heure.
+  if (DATE_SEULE.test(valeur)) {
+    const [a, m, j] = valeur.split("-");
+    return `${j}/${m}/${a}`;
+  }
   const date = new Date(valeur);
   if (isNaN(date)) return String(valeur);
   const options = { day: "2-digit", month: "2-digit", year: "numeric" };
@@ -194,7 +203,14 @@ function formaterDate(valeur, avecHeure = false) {
   return date.toLocaleString("fr-FR", options);
 }
 
-// Rouge (0) -> vert (5), comme rapport._badge_note.
+// Date du jour (heure locale) au format AAAA-MM-JJ.
+function aujourdhui() {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate()]
+    .map((n) => String(n).padStart(2, "0")).join("-");
+}
+
+// Rouge (0) -> vert (5).
 const couleurNote = (note) => `hsl(${(Math.max(0, Math.min(5, note)) / 5) * 120}, 70%, 42%)`;
 
 function badgeNote(note) {
@@ -212,6 +228,100 @@ function lienSur(url) {
   }
 }
 
+// --- Libellés TED -----------------------------------------------------------
+
+// Codes pays TED (ISO 3166-1 alpha-3) -> alpha-2, pour Intl.DisplayNames.
+const PAYS_ALPHA2 = {
+  ALB: "AL", AND: "AD", AUT: "AT", BEL: "BE", BGR: "BG", BIH: "BA", CHE: "CH",
+  CYP: "CY", CZE: "CZ", DEU: "DE", DNK: "DK", ESP: "ES", EST: "EE", FIN: "FI",
+  FRA: "FR", GBR: "GB", GEO: "GE", GRC: "GR", HRV: "HR", HUN: "HU", IRL: "IE",
+  ISL: "IS", ITA: "IT", LIE: "LI", LTU: "LT", LUX: "LU", LVA: "LV", MDA: "MD",
+  MKD: "MK", MLT: "MT", MNE: "ME", NLD: "NL", NOR: "NO", POL: "PL", PRT: "PT",
+  ROU: "RO", SRB: "RS", SVK: "SK", SVN: "SI", SWE: "SE", TUR: "TR", UKR: "UA",
+};
+const NOMS_PAYS = new Intl.DisplayNames(["fr"], { type: "region" });
+
+// "POL, DEU" -> "Pologne, Allemagne" (code brut si inconnu).
+function nomsPays(codes) {
+  return (codes || "").split(",").map((c) => c.trim()).filter(Boolean)
+    .map((c) => (PAYS_ALPHA2[c] ? NOMS_PAYS.of(PAYS_ALPHA2[c]) : c)).join(", ");
+}
+
+const TYPES_AVIS_TED = {
+  "cn-standard": "Avis de marché",
+  "cn-social": "Avis de marché (services sociaux)",
+  "cn-desg": "Concours",
+  "pin-cfc-standard": "Préinformation (mise en concurrence)",
+  "pin-cfc-social": "Préinformation (services sociaux)",
+};
+
+const PROCEDURES_TED = {
+  open: "Procédure ouverte",
+  restricted: "Procédure restreinte",
+  "neg-w-call": "Négociée avec mise en concurrence",
+  "neg-wo-call": "Négociée sans mise en concurrence",
+  "comp-dial": "Dialogue compétitif",
+  "comp-tend": "Procédure concurrentielle avec négociation",
+  innovation: "Partenariat d'innovation",
+  "oth-single": "Autre procédure (une étape)",
+  "oth-mult": "Autre procédure (plusieurs étapes)",
+};
+
+// --- Sources (un onglet chacune) --------------------------------------------
+//   table       : table Supabase lue et modifiée ;
+//   colonnes    : colonnes lues en plus de COLONNES_COMMUNES ;
+//   entetes     : [texte, classe] des colonnes propres, insérées après « Acheteur » ;
+//   acheteur    : contenu de la cellule « Acheteur » ;
+//   objet       : objet affiché ;
+//   cellules    : cellules propres (même ordre que entetes) ;
+//   apresObjet  : colonne affichée après « Objet » (en-tête, cellule) ;
+//   marche      : contenu de la cellule « Marché » ;
+//   recherche   : champs explorés par la recherche libre.
+
+const SOURCES = {
+  boamp: {
+    table: "annonces_boamp",
+    colonnes: ["code_departement", "famille_libelle", "descripteur_libelle"],
+    entetes: [],
+    acheteur: (a) => [
+      el("div", { textContent: a.nomacheteur || "—" }),
+      el("div", { className: "gris", textContent: a.code_departement || "—" }),
+    ],
+    objet: (a) => a.objet,
+    cellules: () => [],
+    apresObjet: { entete: ["Descripteurs", ""], cellule: (a) => el("td", { textContent: a.descripteur_libelle || "" }) },
+    marche: (a) => [
+      el("div", { textContent: a.famille_libelle || "—" }),
+      el("div", { className: "gris", textContent: a.procedure_libelle || "—" }),
+    ],
+    recherche: (a) => [a.objet, a.nomacheteur, a.descripteur_libelle],
+  },
+  ted: {
+    table: "annonces_ted",
+    colonnes: ["objet_fr", "pays", "ville", "type_avis", "libelles_cpv"],
+    entetes: [["Pays", ""]],
+    acheteur: (a) => [
+      el("div", { textContent: a.nomacheteur || "—" }),
+      el("div", { className: "gris", textContent: a.ville || "—" }),
+    ],
+    // Traduction automatique pour les avis non francophones, sinon l'objet d'origine.
+    objet: (a) => a.objet_fr || a.objet,
+    cellules: (a) => [el("td", { textContent: nomsPays(a.pays) || "—" })],
+    apresObjet: { entete: ["Libellés CPV", ""], cellule: (a) => el("td", { textContent: a.libelles_cpv || "" }) },
+    marche: (a) => [
+      el("div", { textContent: TYPES_AVIS_TED[a.type_avis] || a.type_avis || "—" }),
+      el("div", { className: "gris", textContent: PROCEDURES_TED[a.procedure_libelle] || a.procedure_libelle || "—" }),
+    ],
+    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.libelles_cpv, nomsPays(a.pays)],
+  },
+};
+
+// État par source : annonces chargées, ligne « Dernière ingestion », erreur.
+const etat = Object.fromEntries(
+  Object.keys(SOURCES).map((cle) => [cle, { annonces: [], nouveautes: [], erreur: null, charge: false }])
+);
+let sourceActive = "boamp";
+
 // --- Tri et filtres ---------------------------------------------------------
 
 // Les plus récentes d'abord (dateparution, AAAA-MM-JJ). À date égale, même
@@ -227,22 +337,26 @@ function comparer(a, b) {
 }
 
 function estExpiree(annonce) {
-  if (!annonce.datelimitereponse) return false;
-  const limite = new Date(annonce.datelimitereponse);
-  return !isNaN(limite) && limite < new Date();
+  const limite = annonce.datelimitereponse;
+  if (!limite) return false;
+  // Date seule (TED) : l'avis reste ouvert jusqu'à la fin du jour limite.
+  if (DATE_SEULE.test(limite)) return limite < aujourdhui();
+  const date = new Date(limite);
+  return !isNaN(date) && date < new Date();
 }
 
 function annoncesVisibles() {
+  const source = SOURCES[sourceActive];
   const masquerVues = $("masquer-vues").checked;
   const masquerExpirees = $("masquer-expirees").checked;
   const depuis = $("depuis").value; // AAAA-MM-JJ, comparable à dateparution
   const recherche = $("recherche").value.trim().toLowerCase();
 
-  return annonces.filter((a) =>
+  return etat[sourceActive].annonces.filter((a) =>
     !(masquerVues && a.vue) &&
     !(masquerExpirees && estExpiree(a)) &&
     !(depuis && (a.dateparution || "") < depuis) &&
-    !(recherche && ![a.objet, a.nomacheteur, a.descripteur_libelle]
+    !(recherche && !source.recherche(a)
       .some((champ) => (champ || "").toLowerCase().includes(recherche)))
   );
 }
@@ -285,7 +399,26 @@ function celluleNoteEquipe(annonce, ligne) {
   return el("td", { className: "note-equipe" }, [el("div", { className: "notes" }, boutons), trace]);
 }
 
+function afficherEntetes() {
+  const source = SOURCES[sourceActive];
+  const entetes = [
+    ["Acheteur", ""],
+    ...source.entetes,
+    ["Objet", "col-objet"],
+    source.apresObjet.entete,
+    ["Marché", ""],
+    ["Dates", ""],
+    ["Proximité sémantique", ""],
+    ["Analyse LLM", "col-analyse"],
+    ["Évaluation", ""],
+    ["Avis", ""],
+    ["Vue", ""],
+  ];
+  $("entetes").replaceChildren(...entetes.map(([texte, classe]) => el("th", { textContent: texte, className: classe })));
+}
+
 function ligneAnnonce(annonce) {
+  const source = SOURCES[annonce.source];
   const ligne = el("tr");
   ligne.classList.toggle("vue", annonce.vue);
 
@@ -309,19 +442,14 @@ function ligneAnnonce(annonce) {
   const url = lienSur(annonce.url_avis);
 
   ligne.append(
+    el("td", {}, source.acheteur(annonce)),
+    ...source.cellules(annonce),
     el("td", {}, [
-      el("div", { textContent: annonce.nomacheteur || "—" }),
-      el("div", { className: "gris", textContent: annonce.code_departement || "—" }),
-    ]),
-    el("td", {}, [
-      el("div", { className: "objet", textContent: annonce.objet || "" }),
+      el("div", { className: "objet", textContent: source.objet(annonce) || "" }),
       el("div", {}, badges.length ? badges : tiret()),
     ]),
-    el("td", { textContent: annonce.descripteur_libelle || "" }),
-    el("td", {}, [
-      el("div", { textContent: annonce.famille_libelle || "—" }),
-      el("div", { className: "gris", textContent: annonce.procedure_libelle || "—" }),
-    ]),
+    source.apresObjet.cellule(annonce),
+    el("td", {}, source.marche(annonce)),
     el("td", {}, [
       el("div", { textContent: `Publié le ${formaterDate(annonce.dateparution) || "—"}` }),
       el("div", { className: "limite", textContent: `Limite : ${formaterDate(annonce.datelimitereponse, true) || "—"}` }),
@@ -336,6 +464,18 @@ function ligneAnnonce(annonce) {
 }
 
 function afficher() {
+  const { annonces, nouveautes, erreur, charge } = etat[sourceActive];
+  $("nouveautes").replaceChildren(...nouveautes);
+  if (erreur) {
+    $("compteur").textContent = `Erreur de chargement : ${erreur}`;
+    $("lignes").replaceChildren();
+    return;
+  }
+  if (!charge) {
+    $("compteur").textContent = "Chargement…";
+    $("lignes").replaceChildren();
+    return;
+  }
   const visibles = annoncesVisibles();
   const nbVues = annonces.filter((a) => a.vue).length;
   $("compteur").textContent =
@@ -344,41 +484,50 @@ function afficher() {
   $("lignes").replaceChildren(...visibles.map(ligneAnnonce));
 }
 
+function choisirSource(cle) {
+  sourceActive = cle;
+  for (const bouton of document.querySelectorAll(".onglets button")) {
+    bouton.setAttribute("aria-selected", String(bouton.dataset.source === cle));
+  }
+  // Onglet retenu dans l'adresse (#ted) : rechargement et lien partageable.
+  history.replaceState(null, "", cle === "boamp" ? location.pathname : `#${cle}`);
+  afficherEntetes();
+  afficher();
+}
+
 // --- Données ----------------------------------------------------------------
 
-// Dernière ingestion : date de parution la plus récente en base (même curseur
-// que main.py). Compte toutes les annonces collectées ce jour-là (comptage côté
-// Supabase, sans les télécharger) et, parmi elles, celles affichées.
-async function afficherNouveautes() {
+// Dernière ingestion : date de parution la plus récente de la table (même
+// curseur que main.py). Compte toutes les annonces collectées ce jour-là
+// (comptage côté Supabase, sans les télécharger) et, parmi elles, celles affichées.
+async function calculerNouveautes(cle) {
+  const { table } = SOURCES[cle];
   const { data, error } = await client
-    .from("annonces_boamp")
+    .from(table)
     .select("dateparution")
     .not("dateparution", "is", null)
     .order("dateparution", { ascending: false })
     .limit(1);
   const jour = data?.[0]?.dateparution;
-  if (error || !jour) {
-    $("nouveautes").textContent = "";
-    return;
-  }
+  if (error || !jour) return [];
   const { count, error: erreurComptage } = await client
-    .from("annonces_boamp")
+    .from(table)
     .select("idweb", { count: "exact", head: true })
     .eq("dateparution", jour);
-  const retenues = annonces.filter((a) => a.dateparution === jour).length;
+  const retenues = etat[cle].annonces.filter((a) => a.dateparution === jour).length;
   const enGras = el("strong", { textContent: `${retenues} retenues` });
   const debut = `Dernière ingestion (${formaterDate(jour)}) : `;
-  $("nouveautes").replaceChildren(...(erreurComptage
-    ? [debut, enGras]
-    : [`${debut}${count} annonces collectées, dont `, enGras]));
+  return erreurComptage ? [debut, enGras] : [`${debut}${count} annonces collectées, dont `, enGras];
 }
 
-async function charger() {
+async function charger(cle) {
+  const source = SOURCES[cle];
+  const colonnes = [...COLONNES_COMMUNES, ...source.colonnes].join(",");
   const resultat = [];
   for (let debut = 0; ; debut += TAILLE_PAGE) {
     const { data, error } = await client
-      .from("annonces_boamp")
-      .select(COLONNES)
+      .from(source.table)
+      .select(colonnes)
       // Annonces retenues par la pipeline (sauf note LLM à 0), plus celles déjà
       // notées par l'équipe.
       .or("and(rapporte.eq.true,or(analyse_note.is.null,analyse_note.gt.0)),note_humaine.not.is.null")
@@ -388,14 +537,27 @@ async function charger() {
     resultat.push(...data);
     if (data.length < TAILLE_PAGE) break;
   }
-  annonces = resultat.sort(comparer);
-  afficher();
-  await afficherNouveautes();
+  for (const annonce of resultat) annonce.source = cle; // jamais renvoyé à Supabase
+  etat[cle].annonces = resultat.sort(comparer);
+  etat[cle].charge = true;
+  etat[cle].nouveautes = await calculerNouveautes(cle);
+}
+
+async function chargerTout() {
+  await Promise.all(Object.keys(SOURCES).map(async (cle) => {
+    Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
+    try {
+      await charger(cle);
+    } catch (erreur) {
+      etat[cle].erreur = erreur.message;
+    }
+    if (cle === sourceActive) afficher();
+  }));
 }
 
 async function enregistrer(annonce, modifications, ligne) {
   const { data, error } = await client
-    .from("annonces_boamp")
+    .from(SOURCES[annonce.source].table)
     .update(modifications)
     .eq("idweb", annonce.idweb)
     .select("vue,note_humaine,annotation_par,annotation_le");
@@ -416,11 +578,8 @@ async function afficherSelonSession(session) {
   $("application").hidden = !session;
   if (!session) return;
   $("email-utilisateur").textContent = session.user.email;
-  try {
-    await charger();
-  } catch (erreur) {
-    $("compteur").textContent = `Erreur de chargement : ${erreur.message}`;
-  }
+  choisirSource(SOURCES[location.hash.slice(1)] ? location.hash.slice(1) : "boamp");
+  await chargerTout();
 }
 
 $("connexion").addEventListener("submit", async (evenement) => {
@@ -439,9 +598,15 @@ $("connexion").addEventListener("submit", async (evenement) => {
 
 $("deconnexion").addEventListener("click", async () => {
   await client.auth.signOut();
-  annonces = [];
+  for (const cle of Object.keys(etat)) {
+    Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
+  }
   afficherSelonSession(null);
 });
+
+for (const bouton of document.querySelectorAll(".onglets button")) {
+  bouton.addEventListener("click", () => choisirSource(bouton.dataset.source));
+}
 
 for (const id of ["masquer-vues", "masquer-expirees", "depuis", "recherche"]) {
   $(id).addEventListener("input", afficher);
