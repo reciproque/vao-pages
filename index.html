@@ -94,7 +94,7 @@
   td.case-vue input { width: 18px; height: 18px; cursor: pointer; }
   tr.vue { background: #f4f4f6; }
   tr.vue td:not(.case-vue) { opacity: 0.45; }
-  /* Ligne de description sous une annonce (TED) */
+  /* Ligne de description sous une annonce */
   tr.annonce-avec-description td { border-bottom: none; }
   tr.description td { border-top: none; padding: 0 14px 14px; font-size: 13px; line-height: 1.45; }
   tr.description summary { color: #1565c0; font-weight: 500; cursor: pointer; width: fit-content; }
@@ -290,7 +290,7 @@ const PROCEDURES_TED = {
 const SOURCES = {
   boamp: {
     table: "annonces_boamp",
-    colonnes: ["code_departement", "famille_libelle", "descripteur_libelle"],
+    colonnes: ["code_departement", "famille_libelle", "descripteur_libelle", "description"],
     entetes: [],
     acheteur: (a) => [
       el("div", { textContent: a.nomacheteur || "—" }),
@@ -303,7 +303,9 @@ const SOURCES = {
       el("div", { textContent: a.famille_libelle || "—" }),
       el("div", { className: "gris", textContent: a.procedure_libelle || "—" }),
     ],
-    recherche: (a) => [a.objet, a.nomacheteur, a.descripteur_libelle],
+    // Extraite de l'avis complet ; absente si elle répète l'objet.
+    description: (a) => a.description,
+    recherche: (a) => [a.objet, a.nomacheteur, a.descripteur_libelle, a.description],
   },
   ted: {
     table: "annonces_ted",
