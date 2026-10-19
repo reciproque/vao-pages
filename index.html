@@ -96,9 +96,11 @@
   tr.vue td:not(.case-vue) { opacity: 0.45; }
   /* Ligne de description sous une annonce (TED) */
   tr.annonce-avec-description td { border-bottom: none; }
-  tr.description td {
-    border-top: none; padding: 0 14px 16px; font-size: 13px; line-height: 1.45;
-    color: #6e6e73; white-space: pre-line; /* même gris que .gris */
+  tr.description td { border-top: none; padding: 0 14px 14px; font-size: 13px; line-height: 1.45; }
+  tr.description summary { color: #1565c0; font-weight: 500; cursor: pointer; width: fit-content; }
+  tr.description summary:hover { text-decoration: underline; }
+  tr.description .texte-description {
+    color: #6e6e73; white-space: pre-line; margin-top: 6px; /* même gris que .gris */
   }
   .notes { display: flex; flex-direction: column; gap: 3px; }
   .notes button { padding: 3px 8px; border-radius: 6px; white-space: pre-line; text-align: left; }
@@ -282,7 +284,7 @@ const PROCEDURES_TED = {
 //   cellules    : cellules propres (même ordre que entetes) ;
 //   apresObjet  : colonne affichée après « Objet » (en-tête, cellule) ;
 //   marche      : contenu de la cellule « Marché » ;
-//   description : (facultatif) texte affiché sur une ligne sous l'annonce ;
+//   description : (facultatif) texte affiché, replié, sur une ligne sous l'annonce ;
 //   recherche   : champs explorés par la recherche libre.
 
 const SOURCES = {
@@ -332,6 +334,9 @@ const etat = Object.fromEntries(
 );
 let sourceActive = "boamp";
 let nbColonnes = 0; // pour le colspan de la ligne de description
+// Descriptions dépliées ("source:idweb") : gardées ouvertes quand le tableau
+// est redessiné (case « vue », évaluation, filtres).
+const descriptionsOuvertes = new Set();
 
 // --- Tri et filtres ---------------------------------------------------------
 
@@ -478,8 +483,18 @@ function lignesAnnonce(annonce) {
   const description = source.description?.(annonce);
   if (!description) return [ligne];
   ligne.classList.add("annonce-avec-description");
+  // Repliée par défaut : seul « Lire la description » est visible.
+  const cle = `${annonce.source}:${annonce.idweb}`;
+  const depliant = el("details", { open: descriptionsOuvertes.has(cle) }, [
+    el("summary", { textContent: "Lire la description" }),
+    el("div", { className: "texte-description", textContent: description }),
+  ]);
+  depliant.addEventListener("toggle", () => {
+    if (depliant.open) descriptionsOuvertes.add(cle);
+    else descriptionsOuvertes.delete(cle);
+  });
   const ligneDescription = el("tr", { className: "description" },
-    el("td", { colSpan: nbColonnes, textContent: description }));
+    el("td", { colSpan: nbColonnes }, depliant));
   ligneDescription.classList.toggle("vue", annonce.vue);
   return [ligne, ligneDescription];
 }
