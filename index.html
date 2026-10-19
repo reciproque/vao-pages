@@ -94,6 +94,12 @@
   td.case-vue input { width: 18px; height: 18px; cursor: pointer; }
   tr.vue { background: #f4f4f6; }
   tr.vue td:not(.case-vue) { opacity: 0.45; }
+  /* Ligne de description sous une annonce (TED) */
+  tr.annonce-avec-description td { border-bottom: none; }
+  tr.description td {
+    border-top: none; padding: 0 14px 16px; font-size: 13px; line-height: 1.45;
+    color: #424245; white-space: pre-line;
+  }
   .notes { display: flex; flex-direction: column; gap: 3px; }
   .notes button { padding: 3px 8px; border-radius: 6px; white-space: pre-line; text-align: left; }
   .notes button.active { color: #fff; border-color: transparent; font-weight: 600; }
@@ -276,6 +282,7 @@ const PROCEDURES_TED = {
 //   cellules    : cellules propres (même ordre que entetes) ;
 //   apresObjet  : colonne affichée après « Objet » (en-tête, cellule) ;
 //   marche      : contenu de la cellule « Marché » ;
+//   description : (facultatif) texte affiché sur une ligne sous l'annonce ;
 //   recherche   : champs explorés par la recherche libre.
 
 const SOURCES = {
@@ -298,7 +305,7 @@ const SOURCES = {
   },
   ted: {
     table: "annonces_ted",
-    colonnes: ["objet_fr", "pays", "ville", "type_avis", "libelles_cpv"],
+    colonnes: ["objet_fr", "pays", "ville", "type_avis", "libelles_cpv", "description", "description_fr"],
     entetes: [["Pays", ""]],
     acheteur: (a) => [
       el("div", { textContent: a.nomacheteur || "—" }),
@@ -312,7 +319,10 @@ const SOURCES = {
       el("div", { textContent: TYPES_AVIS_TED[a.type_avis] || a.type_avis || "—" }),
       el("div", { className: "gris", textContent: PROCEDURES_TED[a.procedure_libelle] || a.procedure_libelle || "—" }),
     ],
-    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.libelles_cpv, nomsPays(a.pays)],
+    // Description traduite pour les avis non francophones retenus, sinon l'originale
+    // (avis francophones ; avis non retenus affichés pour leur évaluation par l'équipe).
+    description: (a) => a.description_fr || a.description,
+    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.libelles_cpv, nomsPays(a.pays), a.description_fr || a.description],
   },
 };
 
@@ -321,6 +331,7 @@ const etat = Object.fromEntries(
   Object.keys(SOURCES).map((cle) => [cle, { annonces: [], nouveautes: [], erreur: null, charge: false }])
 );
 let sourceActive = "boamp";
+let nbColonnes = 0; // pour le colspan de la ligne de description
 
 // --- Tri et filtres ---------------------------------------------------------
 
@@ -363,10 +374,10 @@ function annoncesVisibles() {
 
 // --- Rendu ------------------------------------------------------------------
 
-function celluleVue(annonce, ligne) {
+function celluleVue(annonce) {
   const caseVue = el("input", { type: "checkbox", checked: annonce.vue, title: "Marquer comme vue" });
   caseVue.addEventListener("change", () =>
-    enregistrer(annonce, { vue: caseVue.checked }, ligne));
+    enregistrer(annonce, { vue: caseVue.checked }));
   return el("td", { className: "case-vue" }, caseVue);
 }
 
@@ -377,7 +388,7 @@ const EVALUATIONS = [
   [1, "Non pertinent", "hsl(0, 70%, 45%)"],
 ];
 
-function celluleNoteEquipe(annonce, ligne) {
+function celluleNoteEquipe(annonce) {
   const boutons = EVALUATIONS.map(([note, libelle, couleur]) => {
     const bouton = el("button", { type: "button", textContent: libelle });
     if (annonce.note_humaine === note) {
@@ -387,7 +398,7 @@ function celluleNoteEquipe(annonce, ligne) {
     }
     // Cliquer sur la note déjà choisie l'efface.
     bouton.addEventListener("click", () => enregistrer(
-      annonce, { note_humaine: annonce.note_humaine === note ? null : note }, ligne));
+      annonce, { note_humaine: annonce.note_humaine === note ? null : note }));
     return bouton;
   });
 
@@ -414,10 +425,13 @@ function afficherEntetes() {
     ["Avis", ""],
     ["Vue", ""],
   ];
+  nbColonnes = entetes.length;
   $("entetes").replaceChildren(...entetes.map(([texte, classe]) => el("th", { textContent: texte, className: classe })));
 }
 
-function ligneAnnonce(annonce) {
+// Une ou deux lignes de tableau par annonce : l'annonce, puis sa description
+// si la source en a une.
+function lignesAnnonce(annonce) {
   const source = SOURCES[annonce.source];
   const ligne = el("tr");
   ligne.classList.toggle("vue", annonce.vue);
@@ -456,11 +470,18 @@ function ligneAnnonce(annonce) {
     ]),
     el("td", { className: "score", textContent: (annonce.score_similarite ?? 0).toFixed(3) }),
     el("td", {}, analyse),
-    celluleNoteEquipe(annonce, ligne),
+    celluleNoteEquipe(annonce),
     el("td", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Voir l'avis" }) : tiret()),
-    celluleVue(annonce, ligne),
+    celluleVue(annonce),
   );
-  return ligne;
+
+  const description = source.description?.(annonce);
+  if (!description) return [ligne];
+  ligne.classList.add("annonce-avec-description");
+  const ligneDescription = el("tr", { className: "description" },
+    el("td", { colSpan: nbColonnes, textContent: description }));
+  ligneDescription.classList.toggle("vue", annonce.vue);
+  return [ligne, ligneDescription];
 }
 
 function afficher() {
@@ -481,7 +502,7 @@ function afficher() {
   $("compteur").textContent =
     `${visibles.length} annonces affichées sur ${annonces.length} — ` +
     `${nbVues} vues, ${annonces.length - nbVues} non vues`;
-  $("lignes").replaceChildren(...visibles.map(ligneAnnonce));
+  $("lignes").replaceChildren(...visibles.flatMap(lignesAnnonce));
 }
 
 function choisirSource(cle) {
@@ -555,7 +576,7 @@ async function chargerTout() {
   }));
 }
 
-async function enregistrer(annonce, modifications, ligne) {
+async function enregistrer(annonce, modifications) {
   const { data, error } = await client
     .from(SOURCES[annonce.source].table)
     .update(modifications)
@@ -564,7 +585,7 @@ async function enregistrer(annonce, modifications, ligne) {
 
   if (error || !data?.length) {
     alert(`Enregistrement impossible : ${error?.message || "aucune ligne modifiée"}`);
-    ligne.replaceWith(ligneAnnonce(annonce)); // revient à l'état en base
+    afficher(); // revient à l'état en base
     return;
   }
   Object.assign(annonce, data[0]);
