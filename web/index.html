@@ -99,6 +99,7 @@
   tr.description td { border-top: none; padding: 0 14px 14px; font-size: 13px; line-height: 1.45; }
   tr.description summary { color: #1565c0; font-weight: 500; cursor: pointer; width: fit-content; }
   tr.description summary:hover { text-decoration: underline; }
+  tr.description .lien-avis { display: block; width: fit-content; margin-top: 4px; font-weight: 500; }
   tr.description .texte-description {
     color: #6e6e73; white-space: pre-line; margin-top: 6px; /* même gris que .gris */
   }
@@ -429,7 +430,6 @@ function afficherEntetes() {
     ["Proximité sémantique", ""],
     ["Analyse LLM", "col-analyse"],
     ["Évaluation", ""],
-    ["Avis", ""],
     ["Vue", ""],
   ];
   nbColonnes = entetes.length;
@@ -437,7 +437,7 @@ function afficherEntetes() {
 }
 
 // Une ou deux lignes de tableau par annonce : l'annonce, puis sa description
-// si la source en a une.
+// (si la source en a une) et le lien vers l'avis.
 function lignesAnnonce(annonce) {
   const source = SOURCES[annonce.source];
   const ligne = el("tr");
@@ -478,25 +478,30 @@ function lignesAnnonce(annonce) {
     el("td", { className: "score", textContent: (annonce.score_similarite ?? 0).toFixed(3) }),
     el("td", {}, analyse),
     celluleNoteEquipe(annonce),
-    el("td", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Voir l'avis" }) : tiret()),
     celluleVue(annonce),
   );
 
   const description = source.description?.(annonce);
-  if (!description) return [ligne];
+  if (!description && !url) return [ligne];
   ligne.classList.add("annonce-avec-description");
   // Repliée par défaut : seul « Lire la description » est visible.
-  const cle = `${annonce.source}:${annonce.idweb}`;
-  const depliant = el("details", { open: descriptionsOuvertes.has(cle) }, [
-    el("summary", { textContent: "Lire la description" }),
-    el("div", { className: "texte-description", textContent: description }),
-  ]);
-  depliant.addEventListener("toggle", () => {
-    if (depliant.open) descriptionsOuvertes.add(cle);
-    else descriptionsOuvertes.delete(cle);
-  });
+  let depliant = null;
+  if (description) {
+    const cle = `${annonce.source}:${annonce.idweb}`;
+    depliant = el("details", { open: descriptionsOuvertes.has(cle) }, [
+      el("summary", { textContent: "Lire la description" }),
+      el("div", { className: "texte-description", textContent: description }),
+    ]);
+    depliant.addEventListener("toggle", () => {
+      if (depliant.open) descriptionsOuvertes.add(cle);
+      else descriptionsOuvertes.delete(cle);
+    });
+  }
+  const lienAvis = url
+    ? el("a", { className: "lien-avis", href: url, target: "_blank", rel: "noopener", textContent: "Voir l'avis" })
+    : null;
   const ligneDescription = el("tr", { className: "description" },
-    el("td", { colSpan: nbColonnes }, depliant));
+    el("td", { colSpan: nbColonnes }, [depliant, lienAvis]));
   ligneDescription.classList.toggle("vue", annonce.vue);
   return [ligne, ligneDescription];
 }
