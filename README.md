@@ -16,12 +16,25 @@ dès que la pipeline a tourné.
 
 - **Annonces affichées** : celles retenues par la pipeline (hors note LLM 0),
   plus celles déjà évaluées par l'équipe.
-- **Tri** : date de publication la plus récente d'abord ; à date égale, note
-  LLM, puis nombre de pôles, puis score.
+- **Tri** : par défaut, date de publication la plus récente d'abord ; à date
+  égale, note LLM, puis nombre de pôles, puis score. Les en-têtes proposent
+  aussi un tri par date de publication, date limite, proximité sémantique et
+  note LLM (décroissant, puis croissant, puis retour au tri par défaut ; les
+  annonces sans valeur toujours en dernier).
 - **Saisie** : case « Vue » et évaluation de l'équipe (non pertinent,
   partiellement pertinent, pertinent).
 - **Filtres** : communs aux deux onglets (vues, date limite passée, date de
-  publication minimale, recherche texte).
+  publication minimale, recherche texte), plus des filtres par colonne propres
+  à chaque onglet, dans les en-têtes : département, tags, descripteurs, type de
+  marché, procédure, note LLM, évaluation (BOAMP) ; pays, tags, libellés CPV,
+  type de marché, procédure, note LLM, évaluation (TED). Les valeurs proposées
+  viennent des annonces chargées, avec un choix « Non renseigné ». Plusieurs
+  valeurs d'un même filtre s'additionnent (OU), des filtres différents se
+  cumulent (ET). « Réinitialiser les filtres » remet à zéro les filtres et le
+  tri de colonne de l'onglet affiché.
+- **Colonnes à valeurs multiples** (jointes par la pipeline) : `descripteur_libelle`
+  et `libelles_cpv` séparés par « ; » (leurs valeurs contiennent des virgules),
+  `code_departement` et `pays` séparés par « , ».
 
 ## Sécurité
 
