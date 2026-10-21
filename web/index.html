@@ -444,6 +444,11 @@ const FILTRES_COMMUNS = [
   { cle: "tags", colonne: "objet", libelle: "Tags", libelleVide: "Sans tag",
     valeurs: (a) => Object.keys(COULEURS_TAGS).filter((colonne) => a[colonne]),
     libelleValeur: (colonne) => COULEURS_TAGS[colonne]?.[0] ?? colonne },
+  // Nombre de badges affichés (= total_poles), 0 compris.
+  { cle: "nb_tags", colonne: "objet", libelle: "Nombre de tags",
+    valeurs: (a) => [Object.keys(COULEURS_TAGS).filter((colonne) => a[colonne]).length],
+    libelleValeur: (n) => (n === "0" ? "Aucun tag" : n === "1" ? "1 tag" : `${n} tags`),
+    ordre: (x, y) => Number(y) - Number(x) },
   { cle: "note_llm", colonne: "analyse", libelle: "Note", libelleVide: "Sans note",
     valeurs: (a) => (a.analyse_note == null ? [] : [a.analyse_note]),
     libelleValeur: (note) => `${note}/5`, ordre: (x, y) => Number(y) - Number(x) },
