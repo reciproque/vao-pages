@@ -258,6 +258,13 @@ function decouper(valeur, separateur) {
   return (valeur || "").split(separateur).map((v) => v.trim()).filter(Boolean);
 }
 
+// Texte entièrement en majuscules -> seule la première lettre reste en majuscule.
+function adoucirMajuscules(texte) {
+  if (!texte || texte !== texte.toLocaleUpperCase("fr") || texte === texte.toLocaleLowerCase("fr")) return texte;
+  const minuscules = texte.toLocaleLowerCase("fr");
+  return minuscules.charAt(0).toLocaleUpperCase("fr") + minuscules.slice(1);
+}
+
 function lienSur(url) {
   try {
     const u = new URL(url);
@@ -744,7 +751,7 @@ function lignesAnnonce(annonce) {
     el("td", {}, source.acheteur(annonce)),
     ...source.cellules(annonce),
     el("td", {}, [
-      el("div", { className: "objet", textContent: source.objet(annonce) || "" }),
+      el("div", { className: "objet", textContent: adoucirMajuscules(source.objet(annonce)) || "" }),
       el("div", {}, badges.length ? badges : tiret()),
     ]),
     source.apresObjet.cellule(annonce),
