@@ -14,13 +14,13 @@ Code, identifiers, comments and UI text are in French; keep that convention.
 python3 -m http.server 8000 --directory web   # serve the page locally
 ```
 
-There is no build, test suite or linter. `node --check` on the extracted `<script>` is the only cheap syntax check.
+There is no build, test suite or linter. `node --check web/app.js` is the only cheap syntax check.
 
 `.github/workflows/pages.yml` deploys `web/` to GitHub Pages on pushes to `main` that touch it. Pages caches for up to 10 minutes, so a just-pushed change may need a hard refresh.
 
 ## Web page and Supabase security
 
-`web/index.html` is a single file with no build step. It loads `@supabase/supabase-js` (pinned) from jsdelivr and uses email/password auth. It contains the project URL and the **publishable** key, which is public by design. Never put a secret or `service_role` key there.
+The page is three plain files with no build step: `web/index.html` (markup), `web/style.css` and `web/app.js` (all the code), loaded as a classic script at the end of `<body>`. It loads `@supabase/supabase-js` (pinned) from jsdelivr and uses email/password auth. `app.js` contains the project URL and the **publishable** key, which is public by design. Never put a secret or `service_role` key there.
 
 Access is enforced in Supabase, not in the page (schema kept in the private repo, applied by hand in the Supabase SQL editor):
 - RLS is on, with policies `lecture` (SELECT) and `maj` (UPDATE) for `authenticated` only. `anon` has no grants.

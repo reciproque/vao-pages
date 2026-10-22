@@ -1,0 +1,113 @@
+body {
+  font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  background: #f5f5f7; margin: 0; padding: 32px; color: #1d1d1f;
+}
+h1 { font-size: 22px; margin: 0 0 4px; }
+.entete { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.sous-titre { color: #6e6e73; margin-bottom: 16px; font-size: 14px; }
+.nouveautes { font-size: 15px; margin: 8px 0 4px; }
+.utilisateur { font-size: 13px; color: #6e6e73; }
+
+/* Onglets */
+.onglets { display: flex; gap: 4px; margin: 16px 0 4px; border-bottom: 1px solid #d2d2d7; }
+.onglets button {
+  border: none; border-bottom: 2px solid transparent; border-radius: 0;
+  background: none; padding: 8px 14px; font-size: 14px; color: #6e6e73;
+}
+.onglets button:hover { background: none; color: #1d1d1f; }
+.onglets button[aria-selected="true"] { color: #1d1d1f; border-bottom-color: #1d1d1f; font-weight: 600; }
+button {
+  font: inherit; font-size: 13px; cursor: pointer; border: 1px solid #d2d2d7;
+  background: #fff; border-radius: 8px; padding: 5px 12px; color: #1d1d1f;
+}
+button:hover { background: #f0f0f2; }
+
+/* Connexion */
+#connexion {
+  max-width: 340px; margin: 80px auto; background: #fff; padding: 28px;
+  border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+#connexion label { display: block; font-size: 13px; color: #555; margin: 14px 0 4px; }
+#connexion input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; border: 1px solid #d2d2d7; border-radius: 8px; }
+#connexion button { margin-top: 18px; width: 100%; padding: 9px; background: #1d1d1f; color: #fff; border: none; }
+.erreur { color: #c62828; font-size: 13px; margin-top: 12px; min-height: 1em; }
+
+/* Filtres */
+.filtres {
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+  font-size: 13px; color: #555; margin-bottom: 16px;
+}
+.filtres input[type=date], .filtres input[type=search] {
+  font: inherit; padding: 4px 8px; border: 1px solid #d2d2d7; border-radius: 8px;
+}
+
+/* Tris et filtres par colonne (dans les en-têtes) */
+th.filtre-actif { background: #dce8f8; color: #1565c0; }
+th .controles {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+  text-transform: none; letter-spacing: normal;
+}
+th .controles button { font-size: 11px; padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
+th .controles button.actif { background: #1565c0; border-color: #1565c0; color: #fff; }
+.panneau-filtre {
+  position: fixed; z-index: 10; display: flex; flex-direction: column;
+  width: max-content; min-width: min(220px, calc(100vw - 16px)); max-width: min(360px, calc(100vw - 16px));
+  background: #fff; border: 1px solid #d2d2d7; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px;
+}
+.panneau-filtre .titre-panneau { font-weight: 600; padding: 10px 12px 4px; }
+.panneau-filtre .liste { overflow-y: auto; padding: 4px 0; }
+.panneau-filtre label { display: flex; gap: 8px; align-items: flex-start; padding: 4px 12px; cursor: pointer; line-height: 1.3; }
+.panneau-filtre label:hover { background: #f5f5f7; }
+.panneau-filtre input { margin: 2px 0 0; flex-shrink: 0; }
+.panneau-filtre .nombre { margin-left: auto; padding-left: 8px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+.panneau-filtre .actions { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid #ececec; }
+
+/* Tableau (mêmes styles que le rapport HTML de rapport.py) */
+.conteneur-tableau { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+table { width: 100%; border-collapse: collapse; background: #fff; min-width: 1150px; }
+th.col-analyse { min-width: 200px; }
+th.col-objet { min-width: 200px; }
+th {
+  text-align: left; background: #efeff1; padding: 12px 14px; font-size: 12px;
+  text-transform: uppercase; letter-spacing: 0.04em; color: #555; vertical-align: top;
+}
+td { padding: 14px; border-top: 1px solid #ececec; font-size: 14px; vertical-align: top; }
+.objet { font-weight: 600; margin-bottom: 6px; line-height: 1.35; }
+.score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gris { color: #6e6e73; margin-top: 4px; }
+.limite { color: #e5441a; margin-top: 4px; font-weight: 600; }
+.vide { color: #999; }
+.badge {
+  color: #fff; padding: 3px 11px; border-radius: 12px; font-size: 12px;
+  margin: 0 6px 4px 0; display: inline-block;
+}
+.badge-note {
+  color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 12px;
+  font-weight: 600; white-space: nowrap;
+}
+a { color: #1565c0; text-decoration: none; font-weight: 500; }
+a:hover { text-decoration: underline; }
+
+/* Annotations */
+td.case-vue { text-align: center; }
+td.case-vue input { width: 18px; height: 18px; cursor: pointer; }
+tr.vue { background: #f4f4f6; }
+tr.vue td:not(.case-vue) { opacity: 0.45; }
+/* Ligne de description sous une annonce */
+tr.annonce-avec-description td { border-bottom: none; }
+tr.description td { border-top: none; padding: 0 14px 14px; font-size: 13px; line-height: 1.45; }
+tr.description summary { color: #1565c0; font-weight: 500; cursor: pointer; width: fit-content; }
+tr.description summary:hover { text-decoration: underline; }
+tr.description .lien-avis { display: block; width: fit-content; margin-top: 4px; font-weight: 500; }
+tr.description .texte-description {
+  color: #6e6e73; white-space: pre-line; margin-top: 6px; /* même gris que .gris */
+}
+.notes { display: flex; flex-direction: column; gap: 3px; }
+.notes button { padding: 3px 8px; border-radius: 6px; white-space: pre-line; text-align: left; }
+.notes button.active { color: #fff; border-color: transparent; font-weight: 600; }
+.trace { font-size: 11px; color: #8e8e93; margin-top: 6px; line-height: 1.3; }
+
+@media (max-width: 700px) {
+  body { padding: 16px; }
+}

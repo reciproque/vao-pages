@@ -9,8 +9,9 @@ un dépôt privé ; ce dépôt public ne contient que la page.
 
 ## Fonctionnement
 
-Fichier unique [`web/index.html`](web/index.html), sans étape de build. Elle
-lit directement les tables Supabase `annonces_boamp` et `annonces_ted` (un
+Trois fichiers, sans étape de build : [`web/index.html`](web/index.html)
+(structure), [`web/style.css`](web/style.css) (styles) et
+[`web/app.js`](web/app.js) (code). Elle lit directement les tables Supabase `annonces_boamp` et `annonces_ted` (un
 onglet par source) : rien n'est régénéré, les nouvelles annonces apparaissent
 dès que la pipeline a tourné.
 
