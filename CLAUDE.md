@@ -23,7 +23,7 @@ There is no build, test suite or linter. `node --check web/app.js` is the only c
 The page is three plain files with no build step: `web/index.html` (markup), `web/style.css` and `web/app.js` (all the code), loaded as a classic script at the end of `<body>`. `index.html` loads them as `style.css?v=N` and `app.js?v=N`: bump `N` in both links whenever either file changes, otherwise browsers may combine a new `index.html` with a cached old file (GitHub Pages serves `max-age=600`). It loads `@supabase/supabase-js` (pinned) from jsdelivr and uses email/password auth. `app.js` contains the project URL and the **publishable** key, which is public by design. Never put a secret or `service_role` key there.
 
 Access is enforced in Supabase, not in the page (schema kept in the private repo, applied by hand in the Supabase SQL editor):
-- RLS is on, with policies `lecture` (SELECT) and `maj` (UPDATE) for `authenticated` only. `anon` has no grants.
+- RLS is on, with policies `lecture` (SELECT) and `maj` (UPDATE) for `authenticated` only, on every row but refusing anonymous sessions. `anon` has no grants.
 - `authenticated` has column-level UPDATE on `vue` and `note_humaine` only. Any new column the page must write needs its own column grant, added in the private repo's schema.
 - `note_humaine` is NULL or between 1 and 3 (1 non pertinent, 2 partiellement pertinent, 3 pertinent; the page shows these labels, not numbers).
 - Trigger `tracer_annotation` fills `annotation_par` (JWT email) and `annotation_le` when `vue` or `note_humaine` changes.
