@@ -37,7 +37,9 @@ function el(balise, proprietes = {}, enfants = []) {
   return noeud;
 }
 
-const tiret = () => el("span", { className: "vide", textContent: "—" });
+// Contenu d'une case (ou d'une ligne de case) sans valeur.
+const VIDE = "_";
+const tiret = () => el("span", { className: "vide", textContent: VIDE });
 
 const DATE_SEULE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -514,7 +516,7 @@ function celluleNoteEquipe(annonce) {
 function afficherEntetes() {
   const entetes = [
     ["Source", "", "source"],
-    ["Acheteur", "", "acheteur"],
+    ["Acheteur", "col-acheteur", "acheteur"],
     ["Pays", "", "pays"],
     ["Objet", "col-objet", "objet"],
     ["Descripteurs / Libellés CPV", "", "categories"],
@@ -597,22 +599,22 @@ function lignesAnnonce(annonce) {
   ligne.append(
     el("td", {}, el("span", { className: "etiquette-source", textContent: source.libelle })),
     el("td", {}, [
-      el("div", { textContent: annonce.nomacheteur || "—" }),
-      el("div", { className: "gris", textContent: source.detailAcheteur(annonce) || "—" }),
+      el("div", { textContent: annonce.nomacheteur || VIDE }),
+      el("div", { className: "gris", textContent: source.detailAcheteur(annonce) || VIDE }),
     ]),
-    el("td", { textContent: source.pays(annonce).map(nomPays).join(", ") || "—" }),
+    el("td", { textContent: source.pays(annonce).map(nomPays).join(", ") || VIDE }),
     el("td", {}, [
-      el("div", { className: "objet", textContent: adoucirMajuscules(source.objet(annonce)) || "" }),
+      el("div", { className: "objet", textContent: adoucirMajuscules(source.objet(annonce)) || VIDE }),
       el("div", {}, badges.length ? badges : tiret()),
     ]),
-    el("td", { textContent: source.categories(annonce).join(" ; ") }),
+    el("td", { textContent: source.categories(annonce).join(" ; ") || VIDE }),
     el("td", {}, [
-      el("div", { textContent: source.typeMarche(annonce) || "—" }),
-      el("div", { className: "gris", textContent: source.procedure(annonce) || "—" }),
+      el("div", { textContent: source.typeMarche(annonce) || VIDE }),
+      el("div", { className: "gris", textContent: source.procedure(annonce) || VIDE }),
     ]),
     el("td", {}, [
-      el("div", { textContent: `Publié le ${formaterDate(annonce.dateparution) || "—"}` }),
-      el("div", { className: "limite", textContent: `Limite : ${formaterDate(annonce.datelimitereponse, true) || "—"}` }),
+      el("div", { textContent: `Publié le ${formaterDate(annonce.dateparution) || VIDE}` }),
+      el("div", { className: "limite", textContent: `Limite : ${formaterDate(annonce.datelimitereponse, true) || VIDE}` }),
     ]),
     el("td", { className: "score", textContent: (annonce.score_similarite ?? 0).toFixed(3) }),
     el("td", {}, analyse),
