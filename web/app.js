@@ -2,7 +2,7 @@
 const SUPABASE_URL = "https://ebwifdmbdialwdsplhsl.supabase.co";
 const SUPABASE_CLE_PUBLIQUE = "sb_publishable_PTTFRwEG-DEVQZYMbWqxaQ_kH6pDJda";
 
-// Colonnes match_* de tagging.CLUSTERS (présentes dans les deux tables) :
+// Colonnes match_* de tagging.CLUSTERS (présentes dans les trois tables) :
 // libellé et couleur du badge. À garder synchronisé avec tagging.CLUSTERS.
 const COULEURS_TAGS = {
   match_prestations: ["Prestations", "#42a016"],
@@ -12,7 +12,7 @@ const COULEURS_TAGS = {
   match_institutions: ["Institutions", "#931cae"],
 };
 
-// Colonnes lues dans les deux tables.
+// Colonnes lues dans les trois tables.
 const COLONNES_COMMUNES = [
   "idweb", "objet", "nomacheteur", "dateparution", "datelimitereponse",
   "procedure_libelle", "url_avis", "score_similarite", "total_poles",
@@ -202,6 +202,27 @@ const SOURCES = {
         libelleValeur: (v) => TYPES_AVIS_TED[v] || v },
       { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [a.procedure_libelle],
         libelleValeur: (v) => PROCEDURES_TED[v] || v },
+    ],
+  },
+  place: {
+    table: "annonces_place",
+    colonnes: ["entite_publique", "reference", "description"],
+    entetes: [],
+    acheteur: (a) => [
+      el("div", { textContent: a.nomacheteur || "—" }),
+      el("div", { className: "gris", textContent: a.entite_publique || "—" }),
+    ],
+    // Intitulé de la consultation.
+    objet: (a) => a.objet,
+    cellules: () => [],
+    apresObjet: { entete: ["Référence", ""], cellule: (a) => el("td", { textContent: a.reference || "" }) },
+    marche: (a) => [el("div", { className: "gris", textContent: a.procedure_libelle || "—" })],
+    // Objet détaillé de la consultation ; absent s'il répète l'intitulé.
+    description: (a) => a.description,
+    recherche: (a) => [a.objet, a.nomacheteur, a.entite_publique, a.reference, a.description],
+    filtres: [
+      { cle: "entite_publique", colonne: "acheteur", libelle: "Entité publique", valeurs: (a) => [a.entite_publique] },
+      { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [a.procedure_libelle] },
     ],
   },
 };

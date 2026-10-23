@@ -6,7 +6,8 @@
 <title>Veille appels d'offres</title>
 <!--
   Page de suivi des annonces retenues par la pipeline, un onglet par source :
-  BOAMP (table annonces_boamp) et TED (table annonces_ted). Chaque source est
+  BOAMP (table annonces_boamp), TED (table annonces_ted) et PLACE (table
+  annonces_place, alertes mail de marches-publics.gouv.fr). Chaque source est
   décrite dans SOURCES (table, colonnes, cellules propres) ; le reste est commun.
 
   Lit directement les tables dans Supabase (aucune régénération quotidienne) :
@@ -43,6 +44,7 @@
   <div class="onglets" role="tablist">
     <button type="button" role="tab" data-source="boamp">BOAMP (France)</button>
     <button type="button" role="tab" data-source="ted">TED (Europe)</button>
+    <button type="button" role="tab" data-source="place">PLACE (État)</button>
   </div>
   <div class="nouveautes" id="nouveautes"></div>
   <div class="sous-titre" id="compteur">Chargement…</div>

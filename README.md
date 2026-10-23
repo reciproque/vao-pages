@@ -11,7 +11,7 @@ un dépôt privé ; ce dépôt public ne contient que la page.
 
 Trois fichiers, sans étape de build : [`web/index.html`](web/index.html)
 (structure), [`web/style.css`](web/style.css) (styles) et
-[`web/app.js`](web/app.js) (code). Elle lit directement les tables Supabase `annonces_boamp` et `annonces_ted` (un
+[`web/app.js`](web/app.js) (code). Elle lit directement les tables Supabase `annonces_boamp`, `annonces_ted` et `annonces_place` (un
 onglet par source) : rien n'est régénéré, les nouvelles annonces apparaissent
 dès que la pipeline a tourné.
 
@@ -24,7 +24,7 @@ dès que la pipeline a tourné.
   annonces sans valeur toujours en dernier).
 - **Saisie** : case « Vue » et évaluation de l'équipe (non pertinent,
   partiellement pertinent, pertinent).
-- **Filtres** : communs aux deux onglets (vues, date limite passée, date de
+- **Filtres** : communs aux trois onglets (vues, date limite passée, date de
   publication minimale, recherche texte), plus des filtres par colonne propres
   à chaque onglet, dans les en-têtes : département, tags, descripteurs, type de
   marché, procédure, note LLM, évaluation (BOAMP) ; pays, tags, libellés CPV,
