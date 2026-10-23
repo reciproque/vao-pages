@@ -674,7 +674,7 @@ function choisirSource(cle) {
 // --- Données ----------------------------------------------------------------
 
 // Dernière ingestion : date de parution la plus récente de la table (même
-// curseur que main.py). Compte toutes les annonces collectées ce jour-là
+// curseur que veille.pipeline). Compte toutes les annonces collectées ce jour-là
 // (comptage côté Supabase, sans les télécharger) et, parmi elles, celles affichées.
 async function calculerNouveautes(cle) {
   const { table } = SOURCES[cle];

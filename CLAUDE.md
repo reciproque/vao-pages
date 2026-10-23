@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Public repository holding only the web page of reciproque's public tender monitoring. It is deployed to GitHub Pages at https://reciproque.github.io/vao-pages/. The pipeline that fills the database (BOAMP and TED ingestion, tagging, scoring, LLM rating) lives in the **private** repo `reciproque/veille-appels-offres-2`, together with the Supabase schema (`sql/schema_supabase.sql`). Never copy pipeline code, profile texts, prompts or secrets into this repo: everything here is public.
+Public repository holding only the web page of reciproque's public tender monitoring. It is deployed to GitHub Pages at https://reciproque.github.io/vao-pages/. The pipeline that fills the database (BOAMP, TED and PLACE ingestion, tagging, scoring, LLM rating) lives in the **private** repo `reciproque/veille-appels-offres-2`, together with the Supabase schema (`sql/schema_supabase.sql`). Never copy pipeline code, profile texts, prompts or secrets into this repo: everything here is public.
 
 Code, identifiers, comments and UI text are in French; keep that convention.
 
