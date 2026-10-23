@@ -136,126 +136,100 @@ const PROCEDURES_TED = {
   "oth-mult": "Autre procédure (plusieurs étapes)",
 };
 
-// --- Sources (un onglet chacune) --------------------------------------------
-//   table       : table Supabase lue et modifiée ;
-//   colonnes    : colonnes lues en plus de COLONNES_COMMUNES ;
-//   entetes     : [texte, classe] des colonnes propres, insérées après « Acheteur » ;
-//   acheteur    : contenu de la cellule « Acheteur » ;
-//   objet       : objet affiché ;
-//   cellules    : cellules propres (même ordre que entetes) ;
-//   apresObjet  : colonne affichée après « Objet » (en-tête, cellule) ;
-//   marche      : contenu de la cellule « Marché » ;
-//   description : (facultatif) texte affiché, replié, sur une ligne sous l'annonce ;
-//   recherche   : champs explorés par la recherche libre ;
-//   filtres     : filtres de colonne propres (voir FILTRES_COMMUNS pour le format).
+// --- Sources ----------------------------------------------------------------
+// Les annonces des quatre tables sont réunies dans un seul tableau. Chaque
+// source dit comment lire ses colonnes :
+//   libelle        : nom affiché dans la colonne « Source » ;
+//   table          : table Supabase lue et modifiée ;
+//   colonnes       : colonnes lues en plus de COLONNES_COMMUNES ;
+//   detailAcheteur : ligne grise sous l'acheteur ;
+//   objet          : objet affiché ;
+//   pays           : codes pays (ISO 3166-1 alpha-3), France pour les sources françaises ;
+//   categories     : descripteurs (BOAMP) ou libellés CPV (TED), en liste ;
+//   typeMarche, procedure : lignes de la colonne « Marché » (libellé, ou vide) ;
+//   departements   : codes département, pour le filtre ;
+//   description    : (facultatif) texte affiché, replié, sur une ligne sous l'annonce ;
+//   recherche      : champs explorés par la recherche libre.
+
+const FRANCE = ["FRA"];
+const aucune = () => [];
 
 const SOURCES = {
   boamp: {
+    libelle: "BOAMP",
     table: "annonces_boamp",
     colonnes: ["code_departement", "famille_libelle", "descripteur_libelle", "procedure_libelle", "description"],
-    entetes: [],
-    acheteur: (a) => [
-      el("div", { textContent: a.nomacheteur || "—" }),
-      el("div", { className: "gris", textContent: a.code_departement || "—" }),
-    ],
+    detailAcheteur: (a) => a.code_departement,
     objet: (a) => a.objet,
-    cellules: () => [],
-    apresObjet: { entete: ["Descripteurs", ""], cellule: (a) => el("td", { textContent: a.descripteur_libelle || "" }) },
-    marche: (a) => [
-      el("div", { textContent: a.famille_libelle || "—" }),
-      el("div", { className: "gris", textContent: a.procedure_libelle || "—" }),
-    ],
+    pays: () => FRANCE,
+    categories: (a) => decouper(a.descripteur_libelle, ";"),
+    typeMarche: (a) => a.famille_libelle,
+    procedure: (a) => a.procedure_libelle,
+    departements: (a) => decouper(a.code_departement, ","),
     // Extraite de l'avis complet ; absente si elle répète l'objet.
     description: (a) => a.description,
     recherche: (a) => [a.objet, a.nomacheteur, a.descripteur_libelle, a.description],
-    filtres: [
-      { cle: "departement", colonne: "acheteur", libelle: "Département", valeurs: (a) => decouper(a.code_departement, ",") },
-      { cle: "descripteur", colonne: "apresObjet", libelle: "Descripteur", valeurs: (a) => decouper(a.descripteur_libelle, ";") },
-      { cle: "famille", colonne: "marche", libelle: "Type de marché", valeurs: (a) => [a.famille_libelle] },
-      { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [a.procedure_libelle] },
-    ],
   },
   ted: {
+    libelle: "TED",
     table: "annonces_ted",
     colonnes: ["objet_fr", "pays", "ville", "type_avis", "libelles_cpv", "procedure_libelle", "description", "description_fr"],
-    entetes: [["Pays", "", "pays"]],
-    acheteur: (a) => [
-      el("div", { textContent: a.nomacheteur || "—" }),
-      el("div", { className: "gris", textContent: a.ville || "—" }),
-    ],
+    detailAcheteur: (a) => a.ville,
     // Traduction automatique pour les avis non francophones, sinon l'objet d'origine.
     objet: (a) => a.objet_fr || a.objet,
-    cellules: (a) => [el("td", { textContent: nomsPays(a.pays) || "—" })],
-    apresObjet: { entete: ["Libellés CPV", ""], cellule: (a) => el("td", { textContent: a.libelles_cpv || "" }) },
-    marche: (a) => [
-      el("div", { textContent: TYPES_AVIS_TED[a.type_avis] || a.type_avis || "—" }),
-      el("div", { className: "gris", textContent: PROCEDURES_TED[a.procedure_libelle] || a.procedure_libelle || "—" }),
-    ],
+    pays: (a) => decouper(a.pays, ","),
+    categories: (a) => decouper(a.libelles_cpv, ";"),
+    typeMarche: (a) => TYPES_AVIS_TED[a.type_avis] || a.type_avis,
+    procedure: (a) => PROCEDURES_TED[a.procedure_libelle] || a.procedure_libelle,
+    departements: aucune,
     // Description traduite pour les avis non francophones retenus, sinon l'originale
     // (avis francophones ; avis non retenus affichés pour leur évaluation par l'équipe).
     description: (a) => a.description_fr || a.description,
     recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.libelles_cpv, nomsPays(a.pays), a.description_fr || a.description],
-    filtres: [
-      { cle: "pays", colonne: "pays", libelle: "Pays", valeurs: (a) => decouper(a.pays, ","), libelleValeur: nomPays },
-      { cle: "cpv", colonne: "apresObjet", libelle: "Libellé CPV", valeurs: (a) => decouper(a.libelles_cpv, ";") },
-      { cle: "type_avis", colonne: "marche", libelle: "Type de marché", valeurs: (a) => [a.type_avis],
-        libelleValeur: (v) => TYPES_AVIS_TED[v] || v },
-      { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [a.procedure_libelle],
-        libelleValeur: (v) => PROCEDURES_TED[v] || v },
-    ],
   },
   place: {
+    libelle: "PLACE",
     table: "annonces_place",
-    colonnes: ["entite_publique", "reference", "procedure_libelle", "description"],
-    entetes: [],
-    acheteur: (a) => [
-      el("div", { textContent: a.nomacheteur || "—" }),
-      el("div", { className: "gris", textContent: a.entite_publique || "—" }),
-    ],
+    colonnes: ["entite_publique", "procedure_libelle", "description"],
+    detailAcheteur: (a) => a.entite_publique,
     // Intitulé de la consultation.
     objet: (a) => a.objet,
-    cellules: () => [],
-    apresObjet: { entete: ["Référence", ""], cellule: (a) => el("td", { textContent: a.reference || "" }) },
-    marche: (a) => [el("div", { className: "gris", textContent: a.procedure_libelle || "—" })],
+    pays: () => FRANCE,
+    categories: aucune,
+    typeMarche: () => null,
+    procedure: (a) => a.procedure_libelle,
+    departements: aucune,
     // Objet détaillé de la consultation ; absent s'il répète l'intitulé.
     description: (a) => a.description,
-    recherche: (a) => [a.objet, a.nomacheteur, a.entite_publique, a.reference, a.description],
-    filtres: [
-      { cle: "entite_publique", colonne: "acheteur", libelle: "Entité publique", valeurs: (a) => [a.entite_publique] },
-      { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [a.procedure_libelle] },
-    ],
+    recherche: (a) => [a.objet, a.nomacheteur, a.entite_publique, a.description],
   },
   aws: {
+    libelle: "AWS",
     table: "annonces_aws",
-    colonnes: ["reference", "rectificatif", "ville", "code_departement"],
-    entetes: [],
+    colonnes: ["rectificatif", "ville", "code_departement"],
     // Ville et département de l'acheteur (déduit de son code postal).
-    acheteur: (a) => [
-      el("div", { textContent: a.nomacheteur || "—" }),
-      el("div", { className: "gris", textContent: [a.ville, a.code_departement && `(${a.code_departement})`].filter(Boolean).join(" ") || "—" }),
-    ],
+    detailAcheteur: (a) => [a.ville, a.code_departement && `(${a.code_departement})`].filter(Boolean).join(" "),
     objet: (a) => a.objet,
-    cellules: () => [],
-    apresObjet: { entete: ["Référence", ""], cellule: (a) => el("td", { textContent: a.reference || "" }) },
-    marche: (a) => [el("div", { className: "gris", textContent: a.rectificatif ? "Avis rectificatif" : "Avis de marché" })],
+    pays: () => FRANCE,
+    categories: aucune,
+    typeMarche: (a) => (a.rectificatif ? "Avis rectificatif" : "Avis de marché"),
+    procedure: () => null,
+    departements: (a) => [a.code_departement],
     // Le mail d'alerte AWS ne donne pas de description ; « Publié le » est la date du mail.
-    recherche: (a) => [a.objet, a.nomacheteur, a.ville, a.reference],
-    filtres: [
-      { cle: "departement", colonne: "acheteur", libelle: "Département", valeurs: (a) => [a.code_departement] },
-      { cle: "type_avis", colonne: "marche", libelle: "Type d'avis", valeurs: (a) => [a.rectificatif ? "rectificatif" : "initial"],
-        libelleValeur: (v) => (v === "rectificatif" ? "Avis rectificatif" : "Avis de marché") },
-    ],
+    recherche: (a) => [a.objet, a.nomacheteur, a.ville],
   },
 };
+const ORDRE_SOURCES = Object.keys(SOURCES);
 
-// État par source : annonces chargées, ligne « Dernière ingestion », erreur,
-// filtres de colonne (clé du filtre -> Set des valeurs cochées) et tri de
-// colonne ({ cle, sens } ou null). Filtres et tri survivent au changement
-// d'onglet et au rechargement des annonces.
-const etat = Object.fromEntries(Object.keys(SOURCES).map((cle) => [cle, {
-  annonces: [], nouveautes: [], erreur: null, charge: false, filtres: {}, tri: null,
+// Chargement par source : annonces, ligne « Dernière ingestion », erreur.
+const etat = Object.fromEntries(ORDRE_SOURCES.map((cle) => [cle, {
+  annonces: [], nouveautes: [], erreur: null, charge: false,
 }]));
-let sourceActive = "boamp";
+// Annonces de toutes les sources chargées, dans l'ordre de comparer.
+let annonces = [];
+// Filtres de colonne (clé du filtre -> Set des valeurs cochées) et tri de
+// colonne ({ cle, sens } ou null) du tableau. Ils survivent au rechargement.
+const affichage = { filtres: {}, tri: null };
 let nbColonnes = 0; // pour le colspan de la ligne de description
 // Descriptions dépliées ("source:idweb") : gardées ouvertes quand le tableau
 // est redessiné (case « vue », évaluation, filtres).
@@ -292,17 +266,24 @@ function estExpiree(annonce) {
   return fin != null && fin < Date.now();
 }
 
-// Filtres de colonne communs aux deux sources ; les sources ajoutent les leurs
-// (SOURCES[cle].filtres). Chaque filtre :
-//   cle           : identifiant, unique dans l'onglet ;
+const sourceDe = (annonce) => SOURCES[annonce.source];
+
+// Filtres de colonne. Chaque filtre :
+//   cle           : identifiant unique ;
 //   colonne       : colonne dont l'en-tête porte le bouton (voir afficherEntetes) ;
 //   libelle       : texte du bouton et titre de la liste ;
 //   valeurs       : valeurs de l'annonce (liste, éventuellement vide) ;
 //   libelleValeur : (facultatif) texte affiché pour une valeur ;
 //   ordre         : (facultatif) tri des valeurs, alphabétique par défaut ;
 //   libelleVide   : (facultatif) choix des annonces sans valeur.
-// Les valeurs proposées sont celles des annonces chargées de l'onglet.
-const FILTRES_COMMUNS = [
+// Les valeurs proposées sont celles des annonces chargées.
+const FILTRES = [
+  { cle: "source", colonne: "source", libelle: "Source", valeurs: (a) => [a.source],
+    libelleValeur: (cle) => SOURCES[cle]?.libelle ?? cle,
+    ordre: (x, y) => ORDRE_SOURCES.indexOf(x) - ORDRE_SOURCES.indexOf(y) },
+  { cle: "departement", colonne: "acheteur", libelle: "Département", valeurs: (a) => sourceDe(a).departements(a) },
+  { cle: "entite_publique", colonne: "acheteur", libelle: "Entité publique", valeurs: (a) => [a.entite_publique] },
+  { cle: "pays", colonne: "pays", libelle: "Pays", valeurs: (a) => sourceDe(a).pays(a), libelleValeur: nomPays },
   { cle: "tags", colonne: "objet", libelle: "Tags", libelleVide: "Sans tag",
     valeurs: (a) => Object.keys(COULEURS_TAGS).filter((colonne) => a[colonne]),
     libelleValeur: (colonne) => COULEURS_TAGS[colonne]?.[0] ?? colonne },
@@ -311,6 +292,9 @@ const FILTRES_COMMUNS = [
     valeurs: (a) => [Object.keys(COULEURS_TAGS).filter((colonne) => a[colonne]).length],
     libelleValeur: (n) => (n === "0" ? "Aucun tag" : n === "1" ? "1 tag" : `${n} tags`),
     ordre: (x, y) => Number(y) - Number(x) },
+  { cle: "categorie", colonne: "categories", libelle: "Descripteur / CPV", valeurs: (a) => sourceDe(a).categories(a) },
+  { cle: "type_marche", colonne: "marche", libelle: "Type de marché", valeurs: (a) => [sourceDe(a).typeMarche(a)] },
+  { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [sourceDe(a).procedure(a)] },
   { cle: "note_llm", colonne: "analyse", libelle: "Note", libelleVide: "Sans note",
     valeurs: (a) => (a.analyse_note == null ? [] : [a.analyse_note]),
     libelleValeur: (note) => `${note}/5`, ordre: (x, y) => Number(y) - Number(x) },
@@ -320,8 +304,8 @@ const FILTRES_COMMUNS = [
     ordre: (x, y) => Number(y) - Number(x) },
 ];
 
-// Tris de colonne, communs aux deux sources. valeur : nombre ou texte
-// comparable, null si absente (toujours en dernier).
+// Tris de colonne. valeur : nombre ou texte comparable, null si absente
+// (toujours en dernier).
 const TRIS = [
   { cle: "publication", colonne: "dates", libelle: "Publication", valeur: (a) => a.dateparution || null },
   { cle: "limite", colonne: "dates", libelle: "Limite", valeur: (a) => finDelai(a.datelimitereponse) },
@@ -331,8 +315,6 @@ const TRIS = [
 
 const NON_RENSEIGNE = ""; // valeur cochée pour retenir les annonces sans valeur
 const COLLATION = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
-
-const filtresDe = (cle) => [...FILTRES_COMMUNS, ...SOURCES[cle].filtres];
 
 // Valeurs distinctes et non vides d'une annonce pour un filtre, en texte.
 function valeursFiltre(filtre, annonce) {
@@ -346,19 +328,18 @@ function passeFiltre(filtre, annonce, cochees) {
 }
 
 function annoncesVisibles() {
-  const source = SOURCES[sourceActive];
-  const { annonces, filtres, tri } = etat[sourceActive];
+  const { filtres, tri } = affichage;
   const masquerVues = $("masquer-vues").checked;
   const masquerExpirees = $("masquer-expirees").checked;
   const depuis = $("depuis").value; // AAAA-MM-JJ, comparable à dateparution
   const recherche = $("recherche").value.trim().toLowerCase();
-  const filtresActifs = filtresDe(sourceActive).filter((f) => filtres[f.cle]?.size);
+  const filtresActifs = FILTRES.filter((f) => filtres[f.cle]?.size);
 
   const visibles = annonces.filter((a) =>
     !(masquerVues && a.vue) &&
     !(masquerExpirees && estExpiree(a)) &&
     !(depuis && (a.dateparution || "") < depuis) &&
-    !(recherche && !source.recherche(a)
+    !(recherche && !sourceDe(a).recherche(a)
       .some((champ) => (champ || "").toLowerCase().includes(recherche))) &&
     filtresActifs.every((f) => passeFiltre(f, a, filtres[f.cle]))
   );
@@ -378,8 +359,8 @@ function annoncesVisibles() {
 
 // Un clic : décroissant, puis croissant, puis retour au tri par défaut.
 function changerTri(cle) {
-  const courant = etat[sourceActive].tri;
-  etat[sourceActive].tri =
+  const courant = affichage.tri;
+  affichage.tri =
     courant?.cle !== cle ? { cle, sens: "desc" }
     : courant.sens === "desc" ? { cle, sens: "asc" }
     : null;
@@ -408,8 +389,7 @@ function basculerPanneau(filtre, bouton) {
 }
 
 function ouvrirPanneau(filtre, bouton) {
-  const { annonces, filtres } = etat[sourceActive];
-  const cochees = (filtres[filtre.cle] ??= new Set());
+  const cochees = (affichage.filtres[filtre.cle] ??= new Set());
 
   // Nombre d'annonces chargées par valeur ; une valeur cochée absente des
   // annonces (après rechargement) reste proposée pour pouvoir la décocher.
@@ -529,15 +509,15 @@ function celluleNoteEquipe(annonce) {
 }
 
 // En-têtes [texte, classe, colonne] : la colonne relie l'en-tête à ses tris
-// (TRIS) et à ses filtres (filtresDe). Reconstruits à chaque affichage depuis
-// etat : rien de l'état des filtres ne vit dans le DOM.
+// (TRIS) et à ses filtres (FILTRES). Reconstruits à chaque affichage depuis
+// affichage : rien de l'état des filtres ne vit dans le DOM.
 function afficherEntetes() {
-  const source = SOURCES[sourceActive];
   const entetes = [
+    ["Source", "", "source"],
     ["Acheteur", "", "acheteur"],
-    ...source.entetes,
+    ["Pays", "", "pays"],
     ["Objet", "col-objet", "objet"],
-    [...source.apresObjet.entete, "apresObjet"],
+    ["Descripteurs / Libellés CPV", "", "categories"],
     ["Marché", "", "marche"],
     ["Dates", "", "dates"],
     ["Proximité sémantique", "", "score"],
@@ -550,7 +530,7 @@ function afficherEntetes() {
 }
 
 function enteteColonne(texte, classe, colonne) {
-  const { filtres, tri } = etat[sourceActive];
+  const { filtres, tri } = affichage;
 
   const boutonsTri = TRIS.filter((t) => t.colonne === colonne).map((t) => {
     const sens = tri?.cle === t.cle ? tri.sens : null;
@@ -566,7 +546,7 @@ function enteteColonne(texte, classe, colonne) {
   });
 
   let filtreActif = false;
-  const boutonsFiltre = filtresDe(sourceActive).filter((f) => f.colonne === colonne).map((f) => {
+  const boutonsFiltre = FILTRES.filter((f) => f.colonne === colonne).map((f) => {
     const nbCochees = filtres[f.cle]?.size || 0;
     filtreActif ||= nbCochees > 0;
     const bouton = el("button", {
@@ -591,7 +571,7 @@ function enteteColonne(texte, classe, colonne) {
 // Une ou deux lignes de tableau par annonce : l'annonce, puis sa description
 // (si la source en a une) et le lien vers l'avis.
 function lignesAnnonce(annonce) {
-  const source = SOURCES[annonce.source];
+  const source = sourceDe(annonce);
   const ligne = el("tr");
   ligne.classList.toggle("vue", annonce.vue);
 
@@ -615,14 +595,21 @@ function lignesAnnonce(annonce) {
   const url = lienSur(annonce.url_avis);
 
   ligne.append(
-    el("td", {}, source.acheteur(annonce)),
-    ...source.cellules(annonce),
+    el("td", {}, el("span", { className: "etiquette-source", textContent: source.libelle })),
+    el("td", {}, [
+      el("div", { textContent: annonce.nomacheteur || "—" }),
+      el("div", { className: "gris", textContent: source.detailAcheteur(annonce) || "—" }),
+    ]),
+    el("td", { textContent: source.pays(annonce).map(nomPays).join(", ") || "—" }),
     el("td", {}, [
       el("div", { className: "objet", textContent: adoucirMajuscules(source.objet(annonce)) || "" }),
       el("div", {}, badges.length ? badges : tiret()),
     ]),
-    source.apresObjet.cellule(annonce),
-    el("td", {}, source.marche(annonce)),
+    el("td", { textContent: source.categories(annonce).join(" ; ") }),
+    el("td", {}, [
+      el("div", { textContent: source.typeMarche(annonce) || "—" }),
+      el("div", { className: "gris", textContent: source.procedure(annonce) || "—" }),
+    ]),
     el("td", {}, [
       el("div", { textContent: `Publié le ${formaterDate(annonce.dateparution) || "—"}` }),
       el("div", { className: "limite", textContent: `Limite : ${formaterDate(annonce.datelimitereponse, true) || "—"}` }),
@@ -659,37 +646,32 @@ function lignesAnnonce(annonce) {
 }
 
 function afficher() {
-  const { annonces, nouveautes, erreur, charge } = etat[sourceActive];
   afficherEntetes(); // état des tris et filtres
-  $("nouveautes").replaceChildren(...nouveautes);
-  if (erreur) {
-    $("compteur").textContent = `Erreur de chargement : ${erreur}`;
-    $("lignes").replaceChildren();
-    return;
-  }
-  if (!charge) {
-    $("compteur").textContent = "Chargement…";
+  // Une ligne « Dernière ingestion » par source chargée.
+  $("nouveautes").replaceChildren(...ORDRE_SOURCES
+    .filter((cle) => etat[cle].nouveautes.length)
+    .map((cle) => el("div", {}, [el("span", { className: "nom-source", textContent: SOURCES[cle].libelle }), ...etat[cle].nouveautes])));
+
+  const erreurs = ORDRE_SOURCES.filter((cle) => etat[cle].erreur).map((cle) =>
+    el("div", { className: "erreur", textContent: `Erreur de chargement ${SOURCES[cle].libelle} : ${etat[cle].erreur}` }));
+  const enCours = ORDRE_SOURCES.filter((cle) => !etat[cle].charge && !etat[cle].erreur);
+  if (enCours.length === ORDRE_SOURCES.length) {
+    $("compteur").replaceChildren("Chargement…");
     $("lignes").replaceChildren();
     return;
   }
   const visibles = annoncesVisibles();
   const nbVues = annonces.filter((a) => a.vue).length;
-  $("compteur").textContent =
+  const chargement = enCours.length
+    ? ` (chargement en cours : ${enCours.map((cle) => SOURCES[cle].libelle).join(", ")})`
+    : "";
+  $("compteur").replaceChildren(
     `${visibles.length} annonces affichées sur ${annonces.length} — ` +
-    `${nbVues} vues, ${annonces.length - nbVues} non vues`;
+    `${nbVues} vues, ${annonces.length - nbVues} non vues${chargement}`,
+    ...erreurs,
+  );
   $("lignes").replaceChildren(...visibles.flatMap(lignesAnnonce));
   positionnerPanneau(); // en-têtes reconstruits, largeurs de colonnes changées
-}
-
-function choisirSource(cle) {
-  sourceActive = cle;
-  for (const bouton of document.querySelectorAll(".onglets button")) {
-    bouton.setAttribute("aria-selected", String(bouton.dataset.source === cle));
-  }
-  // Onglet retenu dans l'adresse (#ted) : rechargement et lien partageable.
-  history.replaceState(null, "", cle === "boamp" ? location.pathname : `#${cle}`);
-  fermerPanneau();
-  afficher();
 }
 
 // --- Données ----------------------------------------------------------------
@@ -713,7 +695,7 @@ async function calculerNouveautes(cle) {
     .eq("dateparution", jour);
   const retenues = etat[cle].annonces.filter((a) => a.dateparution === jour).length;
   const enGras = el("strong", { textContent: `${retenues} retenues` });
-  const debut = `Dernière ingestion (${formaterDate(jour)}) : `;
+  const debut = `dernière ingestion (${formaterDate(jour)}) : `;
   return erreurComptage ? [debut, enGras] : [`${debut}${count} annonces collectées, dont `, enGras];
 }
 
@@ -735,26 +717,33 @@ async function charger(cle) {
     if (data.length < TAILLE_PAGE) break;
   }
   for (const annonce of resultat) annonce.source = cle; // jamais renvoyé à Supabase
-  etat[cle].annonces = resultat.sort(comparer);
+  etat[cle].annonces = resultat;
   etat[cle].charge = true;
   etat[cle].nouveautes = await calculerNouveautes(cle);
 }
 
+function reunirAnnonces() {
+  annonces = ORDRE_SOURCES.flatMap((cle) => etat[cle].annonces).sort(comparer);
+}
+
+// Chaque source s'affiche dès qu'elle est chargée ; une erreur n'empêche pas
+// l'affichage des autres.
 async function chargerTout() {
-  await Promise.all(Object.keys(SOURCES).map(async (cle) => {
+  await Promise.all(ORDRE_SOURCES.map(async (cle) => {
     Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
     try {
       await charger(cle);
     } catch (erreur) {
       etat[cle].erreur = erreur.message;
     }
-    if (cle === sourceActive) afficher();
+    reunirAnnonces();
+    afficher();
   }));
 }
 
 async function enregistrer(annonce, modifications) {
   const { data, error } = await client
-    .from(SOURCES[annonce.source].table)
+    .from(sourceDe(annonce).table)
     .update(modifications)
     .eq("idweb", annonce.idweb)
     .select("vue,note_humaine,annotation_par,annotation_le");
@@ -770,12 +759,25 @@ async function enregistrer(annonce, modifications) {
 
 // --- Session ----------------------------------------------------------------
 
+function viderDonnees() {
+  for (const cle of ORDRE_SOURCES) {
+    Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
+  }
+  annonces = [];
+}
+
 async function afficherSelonSession(session) {
   $("connexion").hidden = !!session;
   $("application").hidden = !session;
   if (!session) return;
   $("email-utilisateur").textContent = session.user.email;
-  choisirSource(SOURCES[location.hash.slice(1)] ? location.hash.slice(1) : "boamp");
+  // Ancien lien d'onglet (#ted) : la source est cochée dans le filtre « Source ».
+  const ancienOnglet = location.hash.slice(1);
+  if (SOURCES[ancienOnglet]) {
+    affichage.filtres.source = new Set([ancienOnglet]);
+    history.replaceState(null, "", location.pathname);
+  }
+  afficher();
   await chargerTout();
 }
 
@@ -795,23 +797,17 @@ $("connexion").addEventListener("submit", async (evenement) => {
 
 $("deconnexion").addEventListener("click", async () => {
   await client.auth.signOut();
-  for (const cle of Object.keys(etat)) {
-    Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
-  }
+  viderDonnees();
   afficherSelonSession(null);
 });
-
-for (const bouton of document.querySelectorAll(".onglets button")) {
-  bouton.addEventListener("click", () => choisirSource(bouton.dataset.source));
-}
 
 for (const id of ["masquer-vues", "masquer-expirees", "depuis", "recherche"]) {
   $(id).addEventListener("input", afficher);
 }
 
-// Filtres et tri de colonne de l'onglet actif ; les filtres communs restent.
+// Filtres et tri de colonne ; les filtres du haut de page restent.
 $("reinitialiser").addEventListener("click", () => {
-  Object.assign(etat[sourceActive], { filtres: {}, tri: null });
+  Object.assign(affichage, { filtres: {}, tri: null });
   fermerPanneau();
   afficher();
 });

@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Veille appels d'offres</title>
 <!--
-  Page de suivi des annonces retenues par la pipeline, un onglet par source :
-  BOAMP (table annonces_boamp), TED (table annonces_ted), PLACE (table
-  annonces_place, alertes mail de marches-publics.gouv.fr) et AWS (table
-  annonces_aws, alertes mail de marches-publics.info). Chaque source est
-  décrite dans SOURCES (table, colonnes, cellules propres) ; le reste est commun.
+  Page de suivi des annonces retenues par la pipeline, réunies dans un seul
+  tableau (colonne « Source ») : BOAMP (table annonces_boamp), TED (table
+  annonces_ted), PLACE (table annonces_place, alertes mail de
+  marches-publics.gouv.fr) et AWS (table annonces_aws, alertes mail de
+  marches-publics.info). Chaque source est décrite dans SOURCES (table,
+  colonnes, lecture de ses champs) ; le reste est commun.
 
   Lit directement les tables dans Supabase (aucune régénération quotidienne) :
   annonces marquées `rapporte` dont la note LLM est absente ou strictement
@@ -21,7 +22,7 @@
   La clé anon/publishable (app.js) est publique par conception : sans
   connexion, elle ne donne accès à rien. Styles dans style.css, code dans app.js.
 -->
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -42,12 +43,6 @@
     <h1>Veille appels d'offres — reciproque</h1>
     <div class="utilisateur"><span id="email-utilisateur"></span> · <button id="deconnexion" type="button">Se déconnecter</button></div>
   </div>
-  <div class="onglets" role="tablist">
-    <button type="button" role="tab" data-source="boamp">BOAMP (France)</button>
-    <button type="button" role="tab" data-source="ted">TED (Europe)</button>
-    <button type="button" role="tab" data-source="place">PLACE (France)</button>
-    <button type="button" role="tab" data-source="aws">AWS (France)</button>
-  </div>
   <div class="nouveautes" id="nouveautes"></div>
   <div class="sous-titre" id="compteur">Chargement…</div>
 
@@ -56,7 +51,7 @@
     <label><input type="checkbox" id="masquer-expirees" checked> Masquer les annonces dont la date limite est passée</label>
     <label>Publiées depuis le <input type="date" id="depuis"></label>
     <label><input type="search" id="recherche" placeholder="Rechercher (objet, acheteur…)"></label>
-    <button type="button" id="reinitialiser" title="Remet à zéro les filtres et le tri des colonnes de cet onglet">Réinitialiser les filtres</button>
+    <button type="button" id="reinitialiser" title="Remet à zéro les filtres et le tri des colonnes du tableau">Réinitialiser les filtres</button>
   </div>
 
   <div class="conteneur-tableau">
@@ -67,6 +62,6 @@
   </div>
 </main>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
