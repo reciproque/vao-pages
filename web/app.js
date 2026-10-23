@@ -2,7 +2,7 @@
 const SUPABASE_URL = "https://ebwifdmbdialwdsplhsl.supabase.co";
 const SUPABASE_CLE_PUBLIQUE = "sb_publishable_PTTFRwEG-DEVQZYMbWqxaQ_kH6pDJda";
 
-// Colonnes match_* de tagging.CLUSTERS (présentes dans les trois tables) :
+// Colonnes match_* de tagging.CLUSTERS (présentes dans toutes les tables) :
 // libellé et couleur du badge. À garder synchronisé avec tagging.CLUSTERS.
 const COULEURS_TAGS = {
   match_prestations: ["Prestations", "#42a016"],
@@ -12,10 +12,10 @@ const COULEURS_TAGS = {
   match_institutions: ["Institutions", "#931cae"],
 };
 
-// Colonnes lues dans les trois tables.
+// Colonnes lues dans toutes les tables.
 const COLONNES_COMMUNES = [
   "idweb", "objet", "nomacheteur", "dateparution", "datelimitereponse",
-  "procedure_libelle", "url_avis", "score_similarite", "total_poles",
+  "url_avis", "score_similarite", "total_poles",
   "analyse_pertinence", "analyse_note", "vue", "note_humaine",
   "annotation_par", "annotation_le", ...Object.keys(COULEURS_TAGS),
 ];
@@ -152,7 +152,7 @@ const PROCEDURES_TED = {
 const SOURCES = {
   boamp: {
     table: "annonces_boamp",
-    colonnes: ["code_departement", "famille_libelle", "descripteur_libelle", "description"],
+    colonnes: ["code_departement", "famille_libelle", "descripteur_libelle", "procedure_libelle", "description"],
     entetes: [],
     acheteur: (a) => [
       el("div", { textContent: a.nomacheteur || "—" }),
@@ -177,7 +177,7 @@ const SOURCES = {
   },
   ted: {
     table: "annonces_ted",
-    colonnes: ["objet_fr", "pays", "ville", "type_avis", "libelles_cpv", "description", "description_fr"],
+    colonnes: ["objet_fr", "pays", "ville", "type_avis", "libelles_cpv", "procedure_libelle", "description", "description_fr"],
     entetes: [["Pays", "", "pays"]],
     acheteur: (a) => [
       el("div", { textContent: a.nomacheteur || "—" }),
@@ -206,7 +206,7 @@ const SOURCES = {
   },
   place: {
     table: "annonces_place",
-    colonnes: ["entite_publique", "reference", "description"],
+    colonnes: ["entite_publique", "reference", "procedure_libelle", "description"],
     entetes: [],
     acheteur: (a) => [
       el("div", { textContent: a.nomacheteur || "—" }),
@@ -223,6 +223,27 @@ const SOURCES = {
     filtres: [
       { cle: "entite_publique", colonne: "acheteur", libelle: "Entité publique", valeurs: (a) => [a.entite_publique] },
       { cle: "procedure", colonne: "marche", libelle: "Procédure", valeurs: (a) => [a.procedure_libelle] },
+    ],
+  },
+  aws: {
+    table: "annonces_aws",
+    colonnes: ["reference", "rectificatif", "ville", "code_departement"],
+    entetes: [],
+    // Ville et département de l'acheteur (déduit de son code postal).
+    acheteur: (a) => [
+      el("div", { textContent: a.nomacheteur || "—" }),
+      el("div", { className: "gris", textContent: [a.ville, a.code_departement && `(${a.code_departement})`].filter(Boolean).join(" ") || "—" }),
+    ],
+    objet: (a) => a.objet,
+    cellules: () => [],
+    apresObjet: { entete: ["Référence", ""], cellule: (a) => el("td", { textContent: a.reference || "" }) },
+    marche: (a) => [el("div", { className: "gris", textContent: a.rectificatif ? "Avis rectificatif" : "Avis de marché" })],
+    // Le mail d'alerte AWS ne donne pas de description ; « Publié le » est la date du mail.
+    recherche: (a) => [a.objet, a.nomacheteur, a.ville, a.reference],
+    filtres: [
+      { cle: "departement", colonne: "acheteur", libelle: "Département", valeurs: (a) => [a.code_departement] },
+      { cle: "type_avis", colonne: "marche", libelle: "Type d'avis", valeurs: (a) => [a.rectificatif ? "rectificatif" : "initial"],
+        libelleValeur: (v) => (v === "rectificatif" ? "Avis rectificatif" : "Avis de marché") },
     ],
   },
 };
