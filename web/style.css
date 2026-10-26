@@ -7,7 +7,6 @@ h1 { font-size: 22px; margin: 0 0 4px; }
 .sous-titre { color: #6e6e73; margin-bottom: 16px; font-size: 14px; }
 .nouveautes { font-size: 15px; margin: 16px 0 4px; line-height: 1.5; }
 .nouveautes .nom-source { font-weight: 600; margin-right: 6px; }
-.nouveautes .date-ingestion { background: #fff1a8; color: inherit; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
 .utilisateur { font-size: 13px; color: #6e6e73; }
 
 button {
