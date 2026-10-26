@@ -56,7 +56,7 @@ th .controles button.actif { background: #1565c0; border-color: #1565c0; color: 
 .panneau-filtre .nombre { margin-left: auto; padding-left: 8px; color: #8e8e93; font-variant-numeric: tabular-nums; }
 .panneau-filtre .actions { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid #ececec; }
 
-/* Tableau (mêmes styles que le rapport HTML de rapport.py) */
+/* Tableau */
 .conteneur-tableau { overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 table { width: 100%; border-collapse: collapse; background: #fff; min-width: 1420px; }
 th.col-analyse { min-width: 200px; }
