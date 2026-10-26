@@ -278,7 +278,8 @@ const sourceDe = (annonce) => SOURCES[annonce.source];
 //   libelleValeur : (facultatif) texte affiché pour une valeur ;
 //   ordre         : (facultatif) tri des valeurs, alphabétique par défaut ;
 //   libelleVide   : (facultatif) choix des annonces sans valeur.
-// Les valeurs proposées sont celles des annonces chargées.
+// Les valeurs proposées et leurs nombres sont ceux des annonces affichées,
+// sans tenir compte du filtre lui-même (voir ouvrirPanneau).
 const FILTRES = [
   { cle: "source", colonne: "source", libelle: "Source", valeurs: (a) => [a.source],
     libelleValeur: (cle) => SOURCES[cle]?.libelle ?? cle,
@@ -329,15 +330,17 @@ function passeFiltre(filtre, annonce, cochees) {
   return valeurs.length ? valeurs.some((v) => cochees.has(v)) : cochees.has(NON_RENSEIGNE);
 }
 
-function annoncesVisibles() {
-  const { filtres, tri } = affichage;
+// Annonces qui passent les filtres du haut de page et les filtres de colonne,
+// sauf celui de clé `sauf` (pour les nombres de sa liste), sans tri de colonne.
+function annoncesFiltrees(sauf = null) {
+  const { filtres } = affichage;
   const masquerVues = $("masquer-vues").checked;
   const masquerExpirees = $("masquer-expirees").checked;
   const depuis = $("depuis").value; // AAAA-MM-JJ, comparable à dateparution
   const recherche = $("recherche").value.trim().toLowerCase();
-  const filtresActifs = FILTRES.filter((f) => filtres[f.cle]?.size);
+  const filtresActifs = FILTRES.filter((f) => f.cle !== sauf && filtres[f.cle]?.size);
 
-  const visibles = annonces.filter((a) =>
+  return annonces.filter((a) =>
     !(masquerVues && a.vue) &&
     !(masquerExpirees && estExpiree(a)) &&
     !(depuis && (a.dateparution || "") < depuis) &&
@@ -345,6 +348,11 @@ function annoncesVisibles() {
       .some((champ) => (champ || "").toLowerCase().includes(recherche))) &&
     filtresActifs.every((f) => passeFiltre(f, a, filtres[f.cle]))
   );
+}
+
+function annoncesVisibles() {
+  const { tri } = affichage;
+  const visibles = annoncesFiltrees();
   if (!tri) return visibles; // déjà dans l'ordre de comparer
 
   // Tri stable : à valeur égale, l'ordre de comparer est conservé.
@@ -393,10 +401,11 @@ function basculerPanneau(filtre, bouton) {
 function ouvrirPanneau(filtre, bouton) {
   const cochees = (affichage.filtres[filtre.cle] ??= new Set());
 
-  // Nombre d'annonces chargées par valeur ; une valeur cochée absente des
-  // annonces (après rechargement) reste proposée pour pouvoir la décocher.
+  // Nombre d'annonces affichées par valeur, en ignorant ce filtre-ci : cocher
+  // une valeur ne fait pas tomber à 0 les autres valeurs de la liste. Une
+  // valeur cochée absente de ces annonces reste proposée pour pouvoir la décocher.
   const nombres = new Map();
-  for (const annonce of annonces) {
+  for (const annonce of annoncesFiltrees(filtre.cle)) {
     const valeurs = valeursFiltre(filtre, annonce);
     for (const v of valeurs.length ? valeurs : [NON_RENSEIGNE]) nombres.set(v, (nombres.get(v) || 0) + 1);
   }
