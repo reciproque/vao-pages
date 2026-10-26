@@ -697,8 +697,9 @@ async function calculerNouveautes(cle) {
     .eq("dateparution", jour);
   const retenues = etat[cle].annonces.filter((a) => a.dateparution === jour).length;
   const enGras = el("strong", { textContent: `${retenues} retenues` });
-  const debut = `dernière ingestion (${formaterDate(jour)}) : `;
-  return erreurComptage ? [debut, enGras] : [`${debut}${count} annonces collectées, dont `, enGras];
+  // Date surlignée : c'est elle qu'on regarde pour savoir si la source est à jour.
+  const debut = ["dernière ingestion le ", el("mark", { className: "date-ingestion", textContent: formaterDate(jour) }), " : "];
+  return erreurComptage ? [...debut, enGras] : [...debut, `${count} annonces collectées, dont `, enGras];
 }
 
 async function charger(cle) {
