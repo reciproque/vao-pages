@@ -12,7 +12,7 @@
   marches-publics.info). Chaque source est décrite dans SOURCES (table,
   colonnes, lecture de ses champs) ; le reste est commun.
   Onglet « Veille ciblée » : relevés de la veille des profils acheteurs (table
-  veille_profils : Dematis, achatpublic, sites d'institutions), en lecture seule.
+  veille_profils : Dematis, achatpublic, sites d'institutions), case « Vue » par profil.
 
   Lit directement les tables dans Supabase (aucune régénération quotidienne) :
   annonces marquées `rapporte` dont la note LLM est absente ou strictement
@@ -24,7 +24,7 @@
   La clé anon/publishable (app.js) est publique par conception : sans
   connexion, elle ne donne accès à rien. Styles dans style.css, code dans app.js.
 -->
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -75,6 +75,7 @@
   <div class="conteneur-tableau">
     <table class="tableau-veille">
       <thead><tr>
+        <th class="col-vue-profil">Vue</th>
         <th>Institution</th>
         <th>Plateforme</th>
         <th>Offres en cours</th>
@@ -87,6 +88,6 @@
   </section>
 </main>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

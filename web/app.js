@@ -772,7 +772,8 @@ async function enregistrer(annonce, modifications) {
 // --- Veille ciblée ----------------------------------------------------------
 // Relevés de la veille des profils acheteurs (table veille_profils, écrite par
 // la pipeline les mercredis et dimanches) : un par profil (url) et par jour de
-// vérification. Lecture seule ; la colonne etat n'est pas accessible à la page.
+// vérification. La page n'y écrit que vue (case « Vue », cochée sur le dernier
+// relevé réussi du profil) ; la colonne etat ne lui est pas accessible.
 
 const TABLE_VEILLE = "veille_profils";
 const JOURS_HISTORIQUE_VEILLE = 60;
@@ -783,9 +784,11 @@ const PLATEFORMES = {
 };
 const ORDRE_PLATEFORMES = Object.keys(PLATEFORMES);
 
-const veille = { profils: [], erreur: null, charge: false };
+const veille = { profils: [], erreur: null, charge: false, depuis: null };
 
 // Relevés d'un profil (du plus récent au plus ancien) -> ce qu'affiche sa ligne.
+// Les relevés remontent au dernier vu s'il est plus ancien que la période
+// affichée (voir chargerVeille).
 function resumerProfil(releves) {
   const [dernier] = releves;
   const reussis = releves.filter((r) => !r.erreur);
@@ -800,15 +803,19 @@ function resumerProfil(releves) {
     texte: (texte.startsWith(`${r.nom} :`) ? texte.slice(r.nom.length + 2).trimStart() : texte)
       .replaceAll(`  ${r.url}`, ""),
   })));
-  return {
-    nom: dernier.nom, plateforme: dernier.plateforme, url: dernier.url, dernier,
+  const profil = {
+    nom: dernier.nom, plateforme: dernier.plateforme, url: dernier.url, releves, dernier,
     reussi: reussis[0] ?? null, precedent: reussis[1] ?? null, erreurDepuis, nouveautes,
   };
+  profil.bilan = bilanNouveautes(profil, reussis);
+  return profil;
 }
 
-// Profils avec les nouveautés les plus récentes d'abord, puis par plateforme et nom.
+// Profils à voir d'abord, puis ceux aux nouveautés les plus récentes, puis par
+// plateforme et nom.
 function comparerProfils(a, b) {
   return (
+    Number(!!b.bilan?.aVoir) - Number(!!a.bilan?.aVoir) ||
     (b.nouveautes[0]?.jour || "").localeCompare(a.nouveautes[0]?.jour || "") ||
     ORDRE_PLATEFORMES.indexOf(a.plateforme) - ORDRE_PLATEFORMES.indexOf(b.plateforme) ||
     COLLATION.compare(a.nom, b.nom)
@@ -822,12 +829,25 @@ async function chargerVeille() {
   const jourDepuis = [depuis.getFullYear(), depuis.getMonth() + 1, depuis.getDate()]
     .map((n) => String(n).padStart(2, "0")).join("-");
   try {
+    // Dernier relevé vu de chaque profil : les nouveautés se comptent depuis
+    // celui-là, même s'il est plus ancien que la période affichée.
+    const { data: vus, error: erreurVus } = await client
+      .from(TABLE_VEILLE)
+      .select("url,jour")
+      .eq("vue", true)
+      .order("jour", { ascending: false })
+      .range(0, TAILLE_PAGE - 1);
+    if (erreurVus) throw erreurVus;
+    const dernierVu = new Map();
+    for (const { url, jour } of vus) if (!dernierVu.has(url)) dernierVu.set(url, jour);
+    const premierJour = [jourDepuis, ...dernierVu.values()].sort()[0];
+
     const releves = [];
     for (let debut = 0; ; debut += TAILLE_PAGE) {
       const { data, error } = await client
         .from(TABLE_VEILLE)
-        .select("id,jour,plateforme,nom,url,nb_offres,nouveautes,erreur")
-        .gte("jour", jourDepuis)
+        .select("id,jour,plateforme,nom,url,nb_offres,nouveautes,erreur,vue,vue_par,vue_le")
+        .gte("jour", premierJour)
         .order("jour", { ascending: false })
         .order("id")
         .range(debut, debut + TAILLE_PAGE - 1);
@@ -840,6 +860,7 @@ async function chargerVeille() {
       if (!parUrl.has(r.url)) parUrl.set(r.url, []);
       parUrl.get(r.url).push(r);
     }
+    veille.depuis = jourDepuis;
     veille.profils = [...parUrl.values()].map(resumerProfil).sort(comparerProfils);
     veille.charge = true;
   } catch (erreur) {
@@ -872,17 +893,57 @@ function nombreAnnonces(texte) {
   return Number(texte.match(/^(\d+) nouvel/)?.[1] ?? 1);
 }
 
-// Bilan de la dernière vérification réussie, en tête de la colonne Nouveautés.
-function bilanNouveautes(profil) {
+const texteNouvelles = (n) => (n === 1 ? "1 nouvelle annonce" : `${n} nouvelles annonces`);
+
+// Bilan en tête de la colonne Nouveautés : { aVoir, texte }, ou null sans
+// relevé réussi. Les nouveautés sont celles des relevés réussis postérieurs au
+// dernier coché « Vue ». Profil jamais vu : tout ce que la page affiche est
+// nouveau (offres en cours, ou la page entière pour un site d'institution).
+function bilanNouveautes(profil, reussis) {
   if (!profil.reussi) return null;
-  // Alertes de ce relevé, sans le « nom : » de tête (voir resumerProfil).
-  const alertes = profil.nouveautes.filter((n) => n.jour === profil.reussi.jour).map((n) => n.texte);
-  if (!alertes.length) return el("div", { className: "bilan sans-nouveaute", textContent: "Pas de nouveauté" });
-  if (profil.plateforme === "institutions") {
-    return el("div", { className: "bilan avec-nouveaute", textContent: "Changement détecté" });
+  const institution = profil.plateforme === "institutions";
+  const vu = reussis.find((r) => r.vue);
+  if (!vu) {
+    const n = profil.reussi.nb_offres;
+    if (institution) return { aVoir: true, texte: "Changement détecté" };
+    return n > 0 ? { aVoir: true, texte: texteNouvelles(n) } : { aVoir: false, texte: "Pas de nouveauté" };
   }
-  const n = alertes.reduce((total, texte) => total + nombreAnnonces(texte), 0);
-  return el("div", { className: "bilan avec-nouveaute", textContent: n === 1 ? "1 nouvelle annonce" : `${n} nouvelles annonces` });
+  // Alertes sans le « nom : » de tête (voir resumerProfil).
+  const alertes = profil.nouveautes.filter((n) => n.jour > vu.jour).map((n) => n.texte);
+  if (!alertes.length) return { aVoir: false, texte: "Pas de nouveauté" };
+  if (institution) return { aVoir: true, texte: "Changement détecté" };
+  return { aVoir: true, texte: texteNouvelles(alertes.reduce((total, texte) => total + nombreAnnonces(texte), 0)) };
+}
+
+// Case « Vue » : cochée sur le dernier relevé réussi, elle remet le bilan à
+// « Pas de nouveauté » jusqu'à la prochaine alerte ; décochée, le bilan repart
+// du relevé vu précédent.
+function celluleVueProfil(profil) {
+  const { reussi } = profil;
+  if (!reussi) return el("td", { className: "case-vue" }, tiret());
+  const caseVue = el("input", { type: "checkbox", checked: reussi.vue, title: "Marquer les nouveautés comme vues" });
+  caseVue.addEventListener("change", () => enregistrerVue(profil, caseVue.checked));
+  const trace = reussi.vue && reussi.vue_par
+    ? el("div", { className: "trace", textContent: `${reussi.vue_par}, le ${formaterDate(reussi.vue_le, true)}` })
+    : null;
+  return el("td", { className: "case-vue" }, [caseVue, trace]);
+}
+
+async function enregistrerVue(profil, vue) {
+  const { data, error } = await client
+    .from(TABLE_VEILLE)
+    .update({ vue })
+    .eq("id", profil.reussi.id)
+    .select("vue,vue_par,vue_le");
+  if (error || !data?.length) {
+    alert(`Enregistrement impossible : ${error?.message || "aucune ligne modifiée"}`);
+  } else {
+    Object.assign(profil.reussi, data[0]);
+    // Même place dans le tableau : le tri n'est refait qu'au chargement.
+    const i = veille.profils.indexOf(profil);
+    veille.profils[i] = resumerProfil(profil.releves);
+  }
+  afficherVeille();
 }
 
 // Texte d'alerte -> nœuds, adresses http(s) transformées en liens.
@@ -895,14 +956,16 @@ function texteAvecLiens(texte) {
 
 function ligneProfil(profil) {
   const url = lienSur(profil.url);
-  // Bilan de la dernière vérification, puis le détail daté de la période.
+  const { bilan } = profil;
+  // Bilan, puis le détail daté de la période affichée.
   const nouveautes = [
-    bilanNouveautes(profil),
-    ...profil.nouveautes.map((n) => el("div", { className: "nouveaute" }, [
+    bilan ? el("div", { className: `bilan ${bilan.aVoir ? "avec-nouveaute" : "sans-nouveaute"}`, textContent: bilan.texte }) : null,
+    ...profil.nouveautes.filter((n) => n.jour >= veille.depuis).map((n) => el("div", { className: "nouveaute" }, [
       el("span", { className: "jour", textContent: formaterDate(n.jour) }), ...texteAvecLiens(n.texte),
     ])),
   ].filter(Boolean);
   return el("tr", {}, [
+    celluleVueProfil(profil),
     el("td", {}, [
       el("div", { className: "objet", textContent: profil.nom }),
       url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Voir la page" }) : null,
@@ -939,11 +1002,11 @@ function afficherVeille() {
   }
   const derniere = profils.map((p) => p.dernier.jour).sort().at(-1);
   const enErreur = profils.filter((p) => p.dernier.erreur).length;
-  const avecNouveautes = profils.filter((p) => p.nouveautes.length).length;
+  const aVoir = profils.filter((p) => p.bilan?.aVoir).length;
   $("compteur-veille").replaceChildren(
     `${profils.length} profils suivis — dernière vérification le `,
     el("strong", { textContent: formaterDate(derniere) }),
-    ` — ${avecNouveautes} avec des nouveautés` + (enErreur ? `, ${enErreur} en erreur` : ""),
+    ` — ${aVoir} avec des nouveautés à voir` + (enErreur ? `, ${enErreur} en erreur` : ""),
   );
   $("lignes-veille").replaceChildren(...profils.map(ligneProfil));
 }
@@ -973,7 +1036,7 @@ function viderDonnees() {
     Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
   }
   annonces = [];
-  Object.assign(veille, { profils: [], erreur: null, charge: false });
+  Object.assign(veille, { profils: [], erreur: null, charge: false, depuis: null });
 }
 
 async function afficherSelonSession(session) {
