@@ -121,7 +121,10 @@ th.col-nouveautes { min-width: 320px; }
 .evolution { font-size: 12px; font-weight: 600; margin-left: 6px; }
 .evolution.hausse { color: hsl(120, 70%, 32%); }
 .evolution.baisse { color: #6e6e73; }
-.nouveaute { white-space: pre-line; line-height: 1.4; }
+.bilan { font-weight: 600; margin-bottom: 6px; }
+.bilan.sans-nouveaute { color: #c62828; }
+.bilan.avec-nouveaute { color: hsl(120, 70%, 32%); }
+.nouveaute { white-space: pre-line; line-height: 1.4; color: #6e6e73; }
 .nouveaute + .nouveaute { margin-top: 8px; }
 .nouveaute .jour { font-weight: 600; margin-right: 6px; }
 .erreur-veille { color: #c62828; margin-top: 4px; font-size: 13px; }

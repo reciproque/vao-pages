@@ -776,7 +776,11 @@ async function enregistrer(annonce, modifications) {
 
 const TABLE_VEILLE = "veille_profils";
 const JOURS_HISTORIQUE_VEILLE = 60;
-const PLATEFORMES = { dematis: "Dematis", achatpublic: "achatpublic", institutions: "Site de l'institution" };
+const PLATEFORMES = {
+  dematis: "Dematis (e-marchespublics.com)",
+  achatpublic: "Salle des marchés (achatpublic.com)",
+  institutions: "Site de l'institution",
+};
 const ORDRE_PLATEFORMES = Object.keys(PLATEFORMES);
 
 const veille = { profils: [], erreur: null, charge: false };
@@ -862,6 +866,25 @@ function celluleOffres(profil) {
   return el("td", {}, contenu);
 }
 
+// Nombre d'annonces nouvelles d'une alerte : Dematis en signale plusieurs à la
+// fois (« 2 nouvel(s) avis de marché (7 -> 9) »), achatpublic une par alerte.
+function nombreAnnonces(texte) {
+  return Number(texte.match(/^(\d+) nouvel/)?.[1] ?? 1);
+}
+
+// Bilan de la dernière vérification réussie, en tête de la colonne Nouveautés.
+function bilanNouveautes(profil) {
+  if (!profil.reussi) return null;
+  // Alertes de ce relevé, sans le « nom : » de tête (voir resumerProfil).
+  const alertes = profil.nouveautes.filter((n) => n.jour === profil.reussi.jour).map((n) => n.texte);
+  if (!alertes.length) return el("div", { className: "bilan sans-nouveaute", textContent: "Pas de nouveauté" });
+  if (profil.plateforme === "institutions") {
+    return el("div", { className: "bilan avec-nouveaute", textContent: "Changement détecté" });
+  }
+  const n = alertes.reduce((total, texte) => total + nombreAnnonces(texte), 0);
+  return el("div", { className: "bilan avec-nouveaute", textContent: n === 1 ? "1 nouvelle annonce" : `${n} nouvelles annonces` });
+}
+
 // Texte d'alerte -> nœuds, adresses http(s) transformées en liens.
 function texteAvecLiens(texte) {
   return texte.split(/(https?:\/\/\S+)/).map((morceau, i) => {
@@ -872,11 +895,13 @@ function texteAvecLiens(texte) {
 
 function ligneProfil(profil) {
   const url = lienSur(profil.url);
-  const nouveautes = profil.nouveautes.length
-    ? profil.nouveautes.map((n) => el("div", { className: "nouveaute" }, [
-        el("span", { className: "jour", textContent: formaterDate(n.jour) }), ...texteAvecLiens(n.texte),
-      ]))
-    : tiret();
+  // Bilan de la dernière vérification, puis le détail daté de la période.
+  const nouveautes = [
+    bilanNouveautes(profil),
+    ...profil.nouveautes.map((n) => el("div", { className: "nouveaute" }, [
+      el("span", { className: "jour", textContent: formaterDate(n.jour) }), ...texteAvecLiens(n.texte),
+    ])),
+  ].filter(Boolean);
   return el("tr", {}, [
     el("td", {}, [
       el("div", { className: "objet", textContent: profil.nom }),
@@ -884,7 +909,7 @@ function ligneProfil(profil) {
     ]),
     el("td", { textContent: PLATEFORMES[profil.plateforme] || profil.plateforme }),
     celluleOffres(profil),
-    el("td", {}, nouveautes),
+    el("td", {}, nouveautes.length ? nouveautes : tiret()),
     el("td", {}, [
       el("div", { textContent: formaterDate(profil.dernier.jour) }),
       profil.dernier.erreur
