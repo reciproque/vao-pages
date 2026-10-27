@@ -11,6 +11,8 @@
   marches-publics.gouv.fr) et AWS (table annonces_aws, alertes mail de
   marches-publics.info). Chaque source est décrite dans SOURCES (table,
   colonnes, lecture de ses champs) ; le reste est commun.
+  Onglet « Veille ciblée » : relevés de la veille des profils acheteurs (table
+  veille_profils : Dematis, achatpublic, sites d'institutions), en lecture seule.
 
   Lit directement les tables dans Supabase (aucune régénération quotidienne) :
   annonces marquées `rapporte` dont la note LLM est absente ou strictement
@@ -22,7 +24,7 @@
   La clé anon/publishable (app.js) est publique par conception : sans
   connexion, elle ne donne accès à rien. Styles dans style.css, code dans app.js.
 -->
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -43,6 +45,12 @@
     <h1>Veille appels d'offres — reciproque</h1>
     <div class="utilisateur"><span id="email-utilisateur"></span> · <button id="deconnexion" type="button">Se déconnecter</button></div>
   </div>
+  <div class="onglets" role="tablist">
+    <button type="button" role="tab" data-onglet="annonces">Appels d'offres</button>
+    <button type="button" role="tab" data-onglet="veille-ciblee">Veille ciblée</button>
+  </div>
+
+  <section id="onglet-annonces">
   <div class="nouveautes" id="nouveautes"></div>
   <div class="sous-titre" id="compteur">Chargement…</div>
 
@@ -60,8 +68,25 @@
       <tbody id="lignes"></tbody>
     </table>
   </div>
+  </section>
+
+  <section id="onglet-veille-ciblee" hidden>
+  <div class="sous-titre" id="compteur-veille">Chargement…</div>
+  <div class="conteneur-tableau">
+    <table class="tableau-veille">
+      <thead><tr>
+        <th>Institution</th>
+        <th>Plateforme</th>
+        <th>Offres en cours</th>
+        <th class="col-nouveautes">Nouveautés (60 derniers jours)</th>
+        <th>Dernière vérification</th>
+      </tr></thead>
+      <tbody id="lignes-veille"></tbody>
+    </table>
+  </div>
+  </section>
 </main>
 
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

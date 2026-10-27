@@ -769,6 +769,178 @@ async function enregistrer(annonce, modifications) {
   afficher();
 }
 
+// --- Veille ciblée ----------------------------------------------------------
+// Relevés de la veille des profils acheteurs (table veille_profils, écrite par
+// la pipeline les mercredis et dimanches) : un par profil (url) et par jour de
+// vérification. Lecture seule ; la colonne etat n'est pas accessible à la page.
+
+const TABLE_VEILLE = "veille_profils";
+const JOURS_HISTORIQUE_VEILLE = 60;
+const PLATEFORMES = { dematis: "Dematis", achatpublic: "achatpublic", institutions: "Site de l'institution" };
+const ORDRE_PLATEFORMES = Object.keys(PLATEFORMES);
+
+const veille = { profils: [], erreur: null, charge: false };
+
+// Relevés d'un profil (du plus récent au plus ancien) -> ce qu'affiche sa ligne.
+function resumerProfil(releves) {
+  const [dernier] = releves;
+  const reussis = releves.filter((r) => !r.erreur);
+  // Erreur en cours : date du premier relevé de la série d'erreurs.
+  const finSerie = releves.findIndex((r) => !r.erreur);
+  const erreurDepuis = dernier.erreur ? releves[(finSerie === -1 ? releves.length : finSerie) - 1].jour : null;
+  // Alertes de la pipeline, sans le « nom : » de tête ni l'adresse du profil
+  // (déjà dans la colonne Institution) ; nom du relevé lui-même, le profil a
+  // pu être renommé depuis.
+  const nouveautes = releves.flatMap((r) => (r.nouveautes || []).map((texte) => ({
+    jour: r.jour,
+    texte: (texte.startsWith(`${r.nom} :`) ? texte.slice(r.nom.length + 2).trimStart() : texte)
+      .replaceAll(`  ${r.url}`, ""),
+  })));
+  return {
+    nom: dernier.nom, plateforme: dernier.plateforme, url: dernier.url, dernier,
+    reussi: reussis[0] ?? null, precedent: reussis[1] ?? null, erreurDepuis, nouveautes,
+  };
+}
+
+// Profils avec les nouveautés les plus récentes d'abord, puis par plateforme et nom.
+function comparerProfils(a, b) {
+  return (
+    (b.nouveautes[0]?.jour || "").localeCompare(a.nouveautes[0]?.jour || "") ||
+    ORDRE_PLATEFORMES.indexOf(a.plateforme) - ORDRE_PLATEFORMES.indexOf(b.plateforme) ||
+    COLLATION.compare(a.nom, b.nom)
+  );
+}
+
+async function chargerVeille() {
+  Object.assign(veille, { profils: [], erreur: null, charge: false });
+  const depuis = new Date();
+  depuis.setDate(depuis.getDate() - JOURS_HISTORIQUE_VEILLE);
+  const jourDepuis = [depuis.getFullYear(), depuis.getMonth() + 1, depuis.getDate()]
+    .map((n) => String(n).padStart(2, "0")).join("-");
+  try {
+    const releves = [];
+    for (let debut = 0; ; debut += TAILLE_PAGE) {
+      const { data, error } = await client
+        .from(TABLE_VEILLE)
+        .select("id,jour,plateforme,nom,url,nb_offres,nouveautes,erreur")
+        .gte("jour", jourDepuis)
+        .order("jour", { ascending: false })
+        .order("id")
+        .range(debut, debut + TAILLE_PAGE - 1);
+      if (error) throw error;
+      releves.push(...data);
+      if (data.length < TAILLE_PAGE) break;
+    }
+    const parUrl = new Map();
+    for (const r of releves) {
+      if (!parUrl.has(r.url)) parUrl.set(r.url, []);
+      parUrl.get(r.url).push(r);
+    }
+    veille.profils = [...parUrl.values()].map(resumerProfil).sort(comparerProfils);
+    veille.charge = true;
+  } catch (erreur) {
+    veille.erreur = erreur.message;
+  }
+  afficherVeille();
+}
+
+function celluleOffres(profil) {
+  const { reussi, precedent, dernier } = profil;
+  if (!reussi) return el("td", {}, tiret());
+  if (reussi.nb_offres == null) return el("td", { className: "gris", textContent: "Non comptées" });
+  const contenu = [el("span", { textContent: String(reussi.nb_offres) })];
+  const ecart = precedent?.nb_offres != null ? reussi.nb_offres - precedent.nb_offres : 0;
+  if (ecart) {
+    contenu.push(el("span", {
+      className: `evolution ${ecart > 0 ? "hausse" : "baisse"}`,
+      textContent: ecart > 0 ? `+${ecart}` : `−${-ecart}`,
+      title: `Depuis la vérification du ${formaterDate(precedent.jour)}`,
+    }));
+  }
+  // Profil en erreur : dernier nombre connu.
+  if (dernier.erreur) contenu.push(el("div", { className: "gris", textContent: `au ${formaterDate(reussi.jour)}` }));
+  return el("td", {}, contenu);
+}
+
+// Texte d'alerte -> nœuds, adresses http(s) transformées en liens.
+function texteAvecLiens(texte) {
+  return texte.split(/(https?:\/\/\S+)/).map((morceau, i) => {
+    const url = i % 2 ? lienSur(morceau) : null;
+    return url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "lien" }) : morceau;
+  });
+}
+
+function ligneProfil(profil) {
+  const url = lienSur(profil.url);
+  const nouveautes = profil.nouveautes.length
+    ? profil.nouveautes.map((n) => el("div", { className: "nouveaute" }, [
+        el("span", { className: "jour", textContent: formaterDate(n.jour) }), ...texteAvecLiens(n.texte),
+      ]))
+    : tiret();
+  return el("tr", {}, [
+    el("td", {}, [
+      el("div", { className: "objet", textContent: profil.nom }),
+      url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Voir la page" }) : null,
+    ]),
+    el("td", { textContent: PLATEFORMES[profil.plateforme] || profil.plateforme }),
+    celluleOffres(profil),
+    el("td", {}, nouveautes),
+    el("td", {}, [
+      el("div", { textContent: formaterDate(profil.dernier.jour) }),
+      profil.dernier.erreur
+        ? el("div", { className: "erreur-veille", textContent:
+            `En erreur depuis le ${formaterDate(profil.erreurDepuis)} : ${profil.dernier.erreur}` })
+        : null,
+    ]),
+  ]);
+}
+
+function afficherVeille() {
+  if (veille.erreur) {
+    $("compteur-veille").textContent = `Erreur de chargement : ${veille.erreur}`;
+    $("lignes-veille").replaceChildren();
+    return;
+  }
+  if (!veille.charge) {
+    $("compteur-veille").textContent = "Chargement…";
+    $("lignes-veille").replaceChildren();
+    return;
+  }
+  const { profils } = veille;
+  if (!profils.length) {
+    $("compteur-veille").textContent = `Aucune vérification depuis ${JOURS_HISTORIQUE_VEILLE} jours.`;
+    $("lignes-veille").replaceChildren();
+    return;
+  }
+  const derniere = profils.map((p) => p.dernier.jour).sort().at(-1);
+  const enErreur = profils.filter((p) => p.dernier.erreur).length;
+  const avecNouveautes = profils.filter((p) => p.nouveautes.length).length;
+  $("compteur-veille").replaceChildren(
+    `${profils.length} profils suivis — dernière vérification le `,
+    el("strong", { textContent: formaterDate(derniere) }),
+    ` — ${avecNouveautes} avec des nouveautés` + (enErreur ? `, ${enErreur} en erreur` : ""),
+  );
+  $("lignes-veille").replaceChildren(...profils.map(ligneProfil));
+}
+
+// --- Onglets ----------------------------------------------------------------
+
+const ONGLETS = ["annonces", "veille-ciblee"];
+
+// Onglet retenu dans l'adresse (#veille-ciblee) : rechargement et lien partageable.
+function choisirOnglet(cle) {
+  for (const onglet of ONGLETS) $(`onglet-${onglet}`).hidden = onglet !== cle;
+  for (const bouton of document.querySelectorAll(".onglets button")) {
+    bouton.setAttribute("aria-selected", String(bouton.dataset.onglet === cle));
+  }
+  history.replaceState(null, "", cle === "annonces" ? location.pathname : `#${cle}`);
+  fermerPanneau();
+}
+
+for (const bouton of document.querySelectorAll(".onglets button")) {
+  bouton.addEventListener("click", () => choisirOnglet(bouton.dataset.onglet));
+}
+
 // --- Session ----------------------------------------------------------------
 
 function viderDonnees() {
@@ -776,6 +948,7 @@ function viderDonnees() {
     Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
   }
   annonces = [];
+  Object.assign(veille, { profils: [], erreur: null, charge: false });
 }
 
 async function afficherSelonSession(session) {
@@ -783,14 +956,13 @@ async function afficherSelonSession(session) {
   $("application").hidden = !session;
   if (!session) return;
   $("email-utilisateur").textContent = session.user.email;
-  // Ancien lien d'onglet (#ted) : la source est cochée dans le filtre « Source ».
-  const ancienOnglet = location.hash.slice(1);
-  if (SOURCES[ancienOnglet]) {
-    affichage.filtres.source = new Set([ancienOnglet]);
-    history.replaceState(null, "", location.pathname);
-  }
+  // Ancien lien d'onglet par source (#ted) : la source est cochée dans le filtre « Source ».
+  const ancre = location.hash.slice(1);
+  if (SOURCES[ancre]) affichage.filtres.source = new Set([ancre]);
+  choisirOnglet(ONGLETS.includes(ancre) ? ancre : "annonces");
   afficher();
-  await chargerTout();
+  afficherVeille();
+  await Promise.all([chargerTout(), chargerVeille()]);
 }
 
 $("connexion").addEventListener("submit", async (evenement) => {
