@@ -804,7 +804,7 @@ function resumerProfil(releves) {
       .replaceAll(`  ${r.url}`, ""),
   })));
   const profil = {
-    nom: dernier.nom, plateforme: dernier.plateforme, url: dernier.url, releves, dernier,
+    nom: dernier.nom, ville: dernier.ville, plateforme: dernier.plateforme, url: dernier.url, releves, dernier,
     reussi: reussis[0] ?? null, precedent: reussis[1] ?? null, erreurDepuis, nouveautes,
   };
   profil.bilan = bilanNouveautes(profil, reussis);
@@ -846,7 +846,7 @@ async function chargerVeille() {
     for (let debut = 0; ; debut += TAILLE_PAGE) {
       const { data, error } = await client
         .from(TABLE_VEILLE)
-        .select("id,jour,plateforme,nom,url,nb_offres,nouveautes,erreur,vue,vue_par,vue_le")
+        .select("id,jour,plateforme,nom,ville,url,nb_offres,nouveautes,erreur,vue,vue_par,vue_le")
         .gte("jour", premierJour)
         .order("jour", { ascending: false })
         .order("id")
@@ -970,6 +970,7 @@ function ligneProfil(profil) {
       el("div", { className: "objet", textContent: profil.nom }),
       url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Voir la page" }) : null,
     ]),
+    el("td", {}, profil.ville || tiret()),
     el("td", { textContent: PLATEFORMES[profil.plateforme] || profil.plateforme }),
     celluleOffres(profil),
     el("td", {}, nouveautes.length ? nouveautes : tiret()),
