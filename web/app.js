@@ -796,13 +796,16 @@ function resumerProfil(releves) {
   const finSerie = releves.findIndex((r) => !r.erreur);
   const erreurDepuis = dernier.erreur ? releves[(finSerie === -1 ? releves.length : finSerie) - 1].jour : null;
   // Alertes de la pipeline, sans le « nom : » de tête ni l'adresse du profil
-  // (déjà dans la colonne Institution) ; nom du relevé lui-même, le profil a
-  // pu être renommé depuis.
-  const nouveautes = releves.flatMap((r) => (r.nouveautes || []).map((texte) => ({
-    jour: r.jour,
-    texte: (texte.startsWith(`${r.nom} :`) ? texte.slice(r.nom.length + 2).trimStart() : texte)
-      .replaceAll(`  ${r.url}`, ""),
-  })));
+  // (déjà dans la colonne Institution). Le nom en tête est celui du jour de
+  // l'alerte : un profil renommé depuis a un autre nom dans veille_profils,
+  // d'où la coupe au premier « : » plutôt que sur le nom.
+  const nouveautes = releves.flatMap((r) => (r.nouveautes || []).map((texte) => {
+    const separateur = texte.split("\n")[0].indexOf(" : ");
+    return {
+      jour: r.jour,
+      texte: (separateur === -1 ? texte : texte.slice(separateur + 3)).replaceAll(`  ${r.url}`, ""),
+    };
+  }));
   const profil = {
     nom: dernier.nom, plateforme: dernier.plateforme, url: dernier.url, releves, dernier,
     reussi: reussis[0] ?? null, vu: reussis.find((r) => r.vue) ?? null, erreurDepuis, nouveautes,
