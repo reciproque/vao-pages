@@ -119,9 +119,6 @@ tr.description .texte-description {
 table.tableau-veille { min-width: 900px; }
 th.col-vue-profil { width: 110px; }
 th.col-nouveautes { min-width: 320px; }
-.evolution { font-size: 12px; font-weight: 600; margin-left: 6px; }
-.evolution.hausse { color: hsl(120, 70%, 32%); }
-.evolution.baisse { color: #6e6e73; }
 .bilan { font-weight: 600; margin-bottom: 6px; }
 /* Jaune de la note 2/5 (couleurNote) ; le rouge est réservé aux erreurs. */
 .bilan.sans-nouveaute { color: hsl(48, 70%, 42%); }

@@ -784,7 +784,7 @@ const PLATEFORMES = {
 };
 const ORDRE_PLATEFORMES = Object.keys(PLATEFORMES);
 
-const veille = { profils: [], erreur: null, charge: false, depuis: null };
+const veille = { profils: [], villes: new Map(), erreur: null, charge: false, depuis: null };
 
 // Relevés d'un profil (du plus récent au plus ancien) -> ce qu'affiche sa ligne.
 // Les relevés remontent au dernier vu s'il est plus ancien que la période
@@ -804,10 +804,10 @@ function resumerProfil(releves) {
       .replaceAll(`  ${r.url}`, ""),
   })));
   const profil = {
-    nom: dernier.nom, ville: dernier.ville, plateforme: dernier.plateforme, url: dernier.url, releves, dernier,
-    reussi: reussis[0] ?? null, precedent: reussis[1] ?? null, erreurDepuis, nouveautes,
+    nom: dernier.nom, plateforme: dernier.plateforme, url: dernier.url, releves, dernier,
+    reussi: reussis[0] ?? null, vu: reussis.find((r) => r.vue) ?? null, erreurDepuis, nouveautes,
   };
-  profil.bilan = bilanNouveautes(profil, reussis);
+  profil.bilan = bilanNouveautes(profil);
   return profil;
 }
 
@@ -823,7 +823,7 @@ function comparerProfils(a, b) {
 }
 
 async function chargerVeille() {
-  Object.assign(veille, { profils: [], erreur: null, charge: false });
+  Object.assign(veille, { profils: [], villes: new Map(), erreur: null, charge: false });
   const depuis = new Date();
   depuis.setDate(depuis.getDate() - JOURS_HISTORIQUE_VEILLE);
   const jourDepuis = [depuis.getFullYear(), depuis.getMonth() + 1, depuis.getDate()]
@@ -842,11 +842,21 @@ async function chargerVeille() {
     for (const { url, jour } of vus) if (!dernierVu.has(url)) dernierVu.set(url, jour);
     const premierJour = [jourDepuis, ...dernierVu.values()].sort()[0];
 
+    // Ville : enregistrée une seule fois par profil, sur un relevé qui peut être
+    // plus ancien que la période ; les autres relevés l'ont à NULL.
+    const { data: villes, error: erreurVilles } = await client
+      .from(TABLE_VEILLE)
+      .select("url,ville")
+      .not("ville", "is", null)
+      .range(0, TAILLE_PAGE - 1);
+    if (erreurVilles) throw erreurVilles;
+    veille.villes = new Map(villes.map(({ url, ville }) => [url, ville]));
+
     const releves = [];
     for (let debut = 0; ; debut += TAILLE_PAGE) {
       const { data, error } = await client
         .from(TABLE_VEILLE)
-        .select("id,jour,plateforme,nom,ville,url,nb_offres,nouveautes,erreur,vue,vue_par,vue_le")
+        .select("id,jour,plateforme,nom,url,nb_offres,nouveautes,erreur,vue,vue_par,vue_le")
         .gte("jour", premierJour)
         .order("jour", { ascending: false })
         .order("id")
@@ -870,18 +880,10 @@ async function chargerVeille() {
 }
 
 function celluleOffres(profil) {
-  const { reussi, precedent, dernier } = profil;
+  const { reussi, dernier } = profil;
   if (!reussi) return el("td", {}, tiret());
   if (reussi.nb_offres == null) return el("td", { className: "gris", textContent: "Non comptées" });
   const contenu = [el("span", { textContent: String(reussi.nb_offres) })];
-  const ecart = precedent?.nb_offres != null ? reussi.nb_offres - precedent.nb_offres : 0;
-  if (ecart) {
-    contenu.push(el("span", {
-      className: `evolution ${ecart > 0 ? "hausse" : "baisse"}`,
-      textContent: ecart > 0 ? `+${ecart}` : `−${-ecart}`,
-      title: `Depuis la vérification du ${formaterDate(precedent.jour)}`,
-    }));
-  }
   // Profil en erreur : dernier nombre connu.
   if (dernier.erreur) contenu.push(el("div", { className: "gris", textContent: `au ${formaterDate(reussi.jour)}` }));
   return el("td", {}, contenu);
@@ -899,10 +901,10 @@ const texteNouvelles = (n) => (n === 1 ? "1 nouvelle annonce" : `${n} nouvelles 
 // relevé réussi. Les nouveautés sont celles des relevés réussis postérieurs au
 // dernier coché « Vue ». Profil jamais vu : tout ce que la page affiche est
 // nouveau (offres en cours, ou la page entière pour un site d'institution).
-function bilanNouveautes(profil, reussis) {
+function bilanNouveautes(profil) {
   if (!profil.reussi) return null;
   const institution = profil.plateforme === "institutions";
-  const vu = reussis.find((r) => r.vue);
+  const { vu } = profil;
   if (!vu) {
     const n = profil.reussi.nb_offres;
     if (institution) return { aVoir: true, texte: "Changement détecté" };
@@ -915,30 +917,33 @@ function bilanNouveautes(profil, reussis) {
   return { aVoir: true, texte: texteNouvelles(alertes.reduce((total, texte) => total + nombreAnnonces(texte), 0)) };
 }
 
-// Case « Vue » : cochée sur le dernier relevé réussi, elle remet le bilan à
-// « Pas de nouveauté » jusqu'à la prochaine alerte ; décochée, le bilan repart
-// du relevé vu précédent.
+// Case « Vue » : cochée tant qu'aucune alerte n'a suivi le dernier relevé vu ;
+// une nouvelle annonce la décoche. La cocher marque vu le dernier relevé réussi
+// (bilan « Pas de nouveauté » jusqu'à la prochaine alerte) ; la décocher retire
+// la marque du relevé vu, le bilan repart alors du relevé vu précédent.
 function celluleVueProfil(profil) {
-  const { reussi } = profil;
+  const { reussi, vu, bilan } = profil;
   if (!reussi) return el("td", { className: "case-vue" }, tiret());
-  const caseVue = el("input", { type: "checkbox", checked: reussi.vue, title: "Marquer les nouveautés comme vues" });
+  const cochee = !!vu && !bilan.aVoir;
+  const caseVue = el("input", { type: "checkbox", checked: cochee, title: "Marquer les nouveautés comme vues" });
   caseVue.addEventListener("change", () => enregistrerVue(profil, caseVue.checked));
-  const trace = reussi.vue && reussi.vue_par
-    ? el("div", { className: "trace", textContent: `${reussi.vue_par}, le ${formaterDate(reussi.vue_le, true)}` })
+  const trace = cochee && vu.vue_par
+    ? el("div", { className: "trace", textContent: `${vu.vue_par}, le ${formaterDate(vu.vue_le, true)}` })
     : null;
   return el("td", { className: "case-vue" }, [caseVue, trace]);
 }
 
 async function enregistrerVue(profil, vue) {
+  const releve = vue ? profil.reussi : profil.vu;
   const { data, error } = await client
     .from(TABLE_VEILLE)
     .update({ vue })
-    .eq("id", profil.reussi.id)
+    .eq("id", releve.id)
     .select("vue,vue_par,vue_le");
   if (error || !data?.length) {
     alert(`Enregistrement impossible : ${error?.message || "aucune ligne modifiée"}`);
   } else {
-    Object.assign(profil.reussi, data[0]);
+    Object.assign(releve, data[0]);
     // Même place dans le tableau : le tri n'est refait qu'au chargement.
     const i = veille.profils.indexOf(profil);
     veille.profils[i] = resumerProfil(profil.releves);
@@ -970,7 +975,7 @@ function ligneProfil(profil) {
       el("div", { className: "objet", textContent: profil.nom }),
       url ? el("a", { href: url, target: "_blank", rel: "noopener", textContent: "Voir la page" }) : null,
     ]),
-    el("td", {}, profil.ville || tiret()),
+    el("td", {}, veille.villes.get(profil.url) || tiret()),
     el("td", { textContent: PLATEFORMES[profil.plateforme] || profil.plateforme }),
     celluleOffres(profil),
     el("td", {}, nouveautes.length ? nouveautes : tiret()),
@@ -1037,7 +1042,7 @@ function viderDonnees() {
     Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
   }
   annonces = [];
-  Object.assign(veille, { profils: [], erreur: null, charge: false, depuis: null });
+  Object.assign(veille, { profils: [], villes: new Map(), erreur: null, charge: false, depuis: null });
 }
 
 async function afficherSelonSession(session) {
