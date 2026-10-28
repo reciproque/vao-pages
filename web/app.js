@@ -138,8 +138,23 @@ const PROCEDURES_TED = {
   "oth-mult": "Autre procédure (plusieurs étapes)",
 };
 
+// --- Libellés Simap ---------------------------------------------------------
+
+const TYPES_MARCHE_SIMAP = {
+  construction: "Travaux",
+  service: "Services",
+  supply: "Fournitures",
+};
+
+const PROCEDURES_SIMAP = {
+  open: "Procédure ouverte",
+  selective: "Procédure sélective",
+  invitation: "Procédure sur invitation",
+  direct: "Procédure de gré à gré",
+};
+
 // --- Sources ----------------------------------------------------------------
-// Les annonces des quatre tables sont réunies dans un seul tableau. Chaque
+// Les annonces des cinq tables sont réunies dans un seul tableau. Chaque
 // source dit comment lire ses colonnes :
 //   libelle        : nom affiché dans la colonne « Source » ;
 //   table          : table Supabase lue et modifiée ;
@@ -147,13 +162,14 @@ const PROCEDURES_TED = {
 //   detailAcheteur : ligne grise sous l'acheteur ;
 //   objet          : objet affiché ;
 //   pays           : codes pays (ISO 3166-1 alpha-3), France pour les sources françaises ;
-//   categories     : descripteurs (BOAMP) ou libellés CPV (TED), en liste ;
+//   categories     : descripteurs (BOAMP) ou libellés CPV (TED, Simap), en liste ;
 //   typeMarche, procedure : lignes de la colonne « Marché » (libellé, ou vide) ;
 //   departements   : codes département, pour le filtre ;
 //   description    : (facultatif) texte affiché, replié, sur une ligne sous l'annonce ;
 //   recherche      : champs explorés par la recherche libre.
 
 const FRANCE = ["FRA"];
+const SUISSE = ["CHE"];
 const aucune = () => [];
 
 const SOURCES = {
@@ -219,6 +235,23 @@ const SOURCES = {
     departements: (a) => [a.code_departement],
     // Le mail d'alerte AWS ne donne pas de description ; « Publié le » est la date du mail.
     recherche: (a) => [a.objet, a.nomacheteur, a.ville],
+  },
+  simap: {
+    libelle: "Simap",
+    table: "annonces_simap",
+    colonnes: ["objet_fr", "canton", "ville", "type_marche", "procedure_libelle", "libelles_cpv", "description", "description_fr"],
+    // Lieu d'exécution : ville et canton.
+    detailAcheteur: (a) => [a.ville, a.canton && `(${a.canton})`].filter(Boolean).join(" "),
+    // Traduction automatique pour les projets non francophones, sinon l'objet d'origine.
+    objet: (a) => a.objet_fr || a.objet,
+    pays: () => SUISSE,
+    categories: (a) => decouper(a.libelles_cpv, ";"),
+    typeMarche: (a) => TYPES_MARCHE_SIMAP[a.type_marche] || a.type_marche,
+    procedure: (a) => PROCEDURES_SIMAP[a.procedure_libelle] || a.procedure_libelle,
+    departements: aucune,
+    // Comme TED : description traduite pour les projets non francophones retenus.
+    description: (a) => a.description_fr || a.description,
+    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.ville, a.libelles_cpv, a.description_fr || a.description],
   },
 };
 const ORDRE_SOURCES = Object.keys(SOURCES);
