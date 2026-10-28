@@ -239,19 +239,20 @@ const SOURCES = {
   simap: {
     libelle: "Simap",
     table: "annonces_simap",
-    colonnes: ["objet_fr", "canton", "ville", "type_marche", "procedure_libelle", "libelles_cpv", "description", "description_fr"],
+    colonnes: ["objet_fr", "canton", "ville", "type_marche", "procedure_libelle", "libelles_cpv", "libelle_cpc", "description", "description_fr"],
     // Lieu d'exécution : ville et canton.
     detailAcheteur: (a) => [a.ville, a.canton && `(${a.canton})`].filter(Boolean).join(" "),
     // Traduction automatique pour les projets non francophones, sinon l'objet d'origine.
     objet: (a) => a.objet_fr || a.objet,
     pays: () => SUISSE,
-    categories: (a) => decouper(a.libelles_cpv, ";"),
+    // Catégorie CPC à part : son libellé contient des « ; ».
+    categories: (a) => [...decouper(a.libelles_cpv, ";"), a.libelle_cpc].filter(Boolean),
     typeMarche: (a) => TYPES_MARCHE_SIMAP[a.type_marche] || a.type_marche,
     procedure: (a) => PROCEDURES_SIMAP[a.procedure_libelle] || a.procedure_libelle,
     departements: aucune,
     // Comme TED : description traduite pour les projets non francophones retenus.
     description: (a) => a.description_fr || a.description,
-    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.ville, a.libelles_cpv, a.description_fr || a.description],
+    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.ville, a.libelles_cpv, a.libelle_cpc, a.description_fr || a.description],
   },
 };
 const ORDRE_SOURCES = Object.keys(SOURCES);
