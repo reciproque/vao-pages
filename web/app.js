@@ -1044,6 +1044,12 @@ const MESURES = [
 ];
 // Graphique « Toutes sources » : sans les collectées, qui écraseraient le reste.
 const MESURES_TOTAL = MESURES.slice(1);
+// Colonnes du tableau des chiffres : les trois étapes, plus les annonces notées
+// « pertinent » par l'équipe (pas dans les graphiques).
+const COLONNES_CHIFFRES = [
+  ...MESURES,
+  { cle: "pertinentes", libelle: "Pertinentes", titre: "Notées « pertinent » par l'équipe" },
+];
 
 const statistiques = { lignes: [], erreur: null, charge: false };
 
@@ -1052,7 +1058,7 @@ async function chargerStatistiques() {
   try {
     const { data, error } = await client
       .from(VUE_STATISTIQUES)
-      .select("source,jour,recuperees,analysees_llm,affichees")
+      .select(`source,jour,${COLONNES_CHIFFRES.map(({ cle }) => cle).join(",")}`)
       .gte("jour", ilYa(JOURS_STATISTIQUES - 1))
       .range(0, TAILLE_PAGE - 1);
     if (error) throw error;
@@ -1064,7 +1070,7 @@ async function chargerStatistiques() {
   afficherStatistiques();
 }
 
-const vides = () => Object.fromEntries(MESURES.map(({ cle }) => [cle, 0]));
+const vides = () => Object.fromEntries(COLONNES_CHIFFRES.map(({ cle }) => [cle, 0]));
 
 // Séries par jour (tous les jours de la période, y compris sans annonce) :
 // { total: [mesures…], boamp: […], … }, dans l'ordre de `jours`.
@@ -1075,7 +1081,7 @@ function series(jours) {
   for (const ligne of statistiques.lignes) {
     const i = index.get(ligne.jour);
     if (i == null || !resultat[ligne.source]) continue;
-    for (const { cle } of MESURES) {
+    for (const { cle } of COLONNES_CHIFFRES) {
       resultat[ligne.source][i][cle] += ligne[cle];
       resultat.total[i][cle] += ligne[cle];
     }
@@ -1235,14 +1241,15 @@ function cacherInfobulle() {
   $("infobulle-statistiques").hidden = true;
 }
 
-// Tableau des chiffres (replié) : une ligne par jour, trois colonnes par source.
+// Tableau des chiffres (replié) : une ligne par jour, quatre colonnes par source (COLONNES_CHIFFRES).
 // « 4,2 % », ou un tiret si le dénominateur est nul.
 function pourcentage(n, total) {
   return total ? `${(100 * n / total).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %` : VIDE;
 }
 
 // Ligne « Ratio » sous les totaux d'une source : rien sous les collectées,
-// sélectionnées / collectées, puis retenues / collectées et retenues / sélectionnées.
+// sélectionnées / collectées, retenues / collectées et retenues / sélectionnées,
+// puis pertinentes / collectées et pertinentes / retenues.
 function cellulesRatio(t) {
   const ligne = (texte, precision) => el("div", {}, [texte, el("span", { className: "gris", textContent: ` ${precision}` })]);
   return [
@@ -1252,15 +1259,19 @@ function cellulesRatio(t) {
       ligne(pourcentage(t.affichees, t.recuperees), "des coll."),
       ligne(pourcentage(t.affichees, t.analysees_llm), "des sél."),
     ]),
+    el("td", { className: "nombre" }, [
+      ligne(pourcentage(t.pertinentes, t.recuperees), "des coll."),
+      ligne(pourcentage(t.pertinentes, t.affichees), "des ret."),
+    ]),
   ];
 }
 
 function tableauStatistiques(jours, parSource) {
-  const cellules = (valeurs) => MESURES.map(({ cle }, i) => el("td", {
+  const cellules = (valeurs) => COLONNES_CHIFFRES.map(({ cle }, i) => el("td", {
     className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: String(valeurs[cle]),
   }));
   const somme = (liste) => liste.reduce((t, v) => {
-    for (const { cle } of MESURES) t[cle] += v[cle];
+    for (const { cle } of COLONNES_CHIFFRES) t[cle] += v[cle];
     return t;
   }, vides());
   const cles = ["total", ...ORDRE_SOURCES];
@@ -1268,9 +1279,9 @@ function tableauStatistiques(jours, parSource) {
   $("entetes-statistiques").replaceChildren(
     el("tr", {}, [
       el("th", { rowSpan: 2, textContent: "Jour" }),
-      ...cles.map((cle) => el("th", { colSpan: MESURES.length, className: "debut-groupe", textContent: libelle(cle) })),
+      ...cles.map((cle) => el("th", { colSpan: COLONNES_CHIFFRES.length, className: "debut-groupe", textContent: libelle(cle) })),
     ]),
-    el("tr", {}, cles.flatMap(() => MESURES.map(({ libelle: nom, titre }, i) =>
+    el("tr", {}, cles.flatMap(() => COLONNES_CHIFFRES.map(({ libelle: nom, titre }, i) =>
       el("th", { className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: nom, title: titre })))),
   );
   const totaux = Object.fromEntries(cles.map((cle) => [cle, somme(parSource[cle])]));
