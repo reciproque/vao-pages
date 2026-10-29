@@ -136,6 +136,29 @@ table.tableau-statistiques { min-width: 900px; }
 .tableau-statistiques .debut-groupe { border-left: 1px solid #d2d2d7; }
 .tableau-statistiques th.debut-groupe:not(.nombre) { text-align: center; }
 .tableau-statistiques tr.total td { font-weight: 600; background: #f9f9fb; }
+.legende-statistiques { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: #555; margin-bottom: 12px; }
+.legende-statistiques .carre { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+#graphiques-statistiques { display: flex; flex-direction: column; gap: 12px; }
+.graphique { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 12px 0 4px; overflow: hidden; }
+.graphique .titre-graphique { font-weight: 600; font-size: 14px; padding: 0 14px 4px; }
+.graphique .titre-graphique .gris { font-weight: 400; }
+.graphique svg { display: block; }
+.graphique .grille { stroke: #ececec; stroke-width: 1; }
+.graphique .base { stroke: #c3c2b7; stroke-width: 1; }
+.graphique .graduation { fill: #898781; font-size: 11px; font-variant-numeric: tabular-nums; }
+.graphique .zone-survol { fill: transparent; }
+.graphique .zone-survol:hover { fill: rgba(0,0,0,0.04); }
+.graphique path, .graphique rect:not(.zone-survol), .graphique text { pointer-events: none; }
+.chiffres-statistiques { margin-top: 16px; }
+.chiffres-statistiques summary { color: #1565c0; font-weight: 500; cursor: pointer; width: fit-content; font-size: 14px; margin-bottom: 8px; }
+.infobulle {
+  position: fixed; z-index: 20; pointer-events: none; background: #fff; border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 8px 10px; font-size: 13px; line-height: 1.5;
+}
+.infobulle .jour { font-weight: 600; margin-bottom: 2px; }
+.infobulle .ligne-infobulle { display: flex; align-items: center; gap: 6px; }
+.infobulle .ligne-infobulle .gris { margin-top: 0; }
+.infobulle .trait { width: 12px; height: 3px; border-radius: 2px; }
 
 @media (max-width: 700px) {
   body { padding: 16px; }

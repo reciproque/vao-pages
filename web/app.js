@@ -1054,15 +1054,21 @@ function afficherVeille() {
 
 // --- Onglet « Statistiques » ------------------------------------------------
 // Vue statistiques_quotidiennes (sql/schema_supabase.sql du dépôt de la
-// pipeline) : par source et par jour de publication, annonces enregistrées,
-// envoyées au LLM (rapporte) et affichées (même règle que la page).
+// pipeline) : par source et par jour de publication, annonces collectées
+// (enregistrées en base), sélectionnées (rapporte, envoyées au LLM) et
+// retenues (affichées, même règle que la page). Un graphique en barres
+// empilées pour l'ensemble des sources, puis un par source ; les chiffres
+// sont aussi dans un tableau replié sous les graphiques.
 
 const VUE_STATISTIQUES = "statistiques_quotidiennes";
 const JOURS_STATISTIQUES = 30;
+// Étapes emboîtées, de la plus large à la plus étroite. Rampe d'un seul bleu,
+// du clair au foncé (validée : ordre de clarté, écarts visibles, contraste du
+// plus clair sur fond blanc).
 const MESURES = [
-  { cle: "recuperees", libelle: "Récupérées", titre: "Enregistrées en base après les filtres de collecte" },
-  { cle: "analysees_llm", libelle: "LLM", titre: "Retenues par le seuil de score, envoyées au LLM" },
-  { cle: "affichees", libelle: "Affichées", titre: "Visibles dans l'onglet Appels d'offres" },
+  { cle: "recuperees", libelle: "Collectées", titre: "Enregistrées en base après les filtres de collecte", couleur: "#86b6ef" },
+  { cle: "analysees_llm", libelle: "Sélectionnées", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#2a78d6" },
+  { cle: "affichees", libelle: "Retenues", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#104281" },
 ];
 
 const statistiques = { lignes: [], erreur: null, charge: false };
@@ -1073,7 +1079,7 @@ async function chargerStatistiques() {
     const { data, error } = await client
       .from(VUE_STATISTIQUES)
       .select("source,jour,recuperees,analysees_llm,affichees")
-      .gte("jour", ilYa(JOURS_STATISTIQUES))
+      .gte("jour", ilYa(JOURS_STATISTIQUES - 1))
       .range(0, TAILLE_PAGE - 1);
     if (error) throw error;
     statistiques.lignes = data;
@@ -1084,56 +1090,218 @@ async function chargerStatistiques() {
   afficherStatistiques();
 }
 
-// Cellules des trois mesures d'une source ; la première ouvre le groupe.
-function cellulesMesures(valeurs) {
-  return MESURES.map(({ cle }, i) => el("td", {
-    className: `nombre${i === 0 ? " debut-groupe" : ""}`,
-    textContent: valeurs ? String(valeurs[cle]) : "",
-  }));
+const vides = () => Object.fromEntries(MESURES.map(({ cle }) => [cle, 0]));
+
+// Séries par jour (tous les jours de la période, y compris sans annonce) :
+// { total: [mesures…], boamp: […], … }, dans l'ordre de `jours`.
+function series(jours) {
+  const index = new Map(jours.map((jour, i) => [jour, i]));
+  const resultat = { total: jours.map(vides) };
+  for (const cle of ORDRE_SOURCES) resultat[cle] = jours.map(vides);
+  for (const ligne of statistiques.lignes) {
+    const i = index.get(ligne.jour);
+    if (i == null || !resultat[ligne.source]) continue;
+    for (const { cle } of MESURES) {
+      resultat[ligne.source][i][cle] += ligne[cle];
+      resultat.total[i][cle] += ligne[cle];
+    }
+  }
+  return resultat;
 }
 
-function afficherStatistiques() {
-  const { lignes, erreur, charge } = statistiques;
-  if (erreur || !charge) {
-    $("compteur-statistiques").textContent = erreur ? `Erreur de chargement : ${erreur}` : "Chargement…";
-    $("entetes-statistiques").replaceChildren();
-    $("lignes-statistiques").replaceChildren();
-    return;
-  }
-  $("compteur-statistiques").textContent =
-    `Par jour de publication, sur les ${JOURS_STATISTIQUES} derniers jours. Les annonces dont la date limite ` +
-    "est dépassée depuis plus d'un mois sont supprimées de la base : les jours anciens diminuent avec le temps.";
+const SVG = "http://www.w3.org/2000/svg";
 
-  // jour -> source -> mesures ; total par source sur la période.
-  const parJour = new Map();
-  const totaux = {};
-  for (const ligne of lignes) {
-    if (!parJour.has(ligne.jour)) parJour.set(ligne.jour, {});
-    parJour.get(ligne.jour)[ligne.source] = ligne;
-    totaux[ligne.source] ??= Object.fromEntries(MESURES.map(({ cle }) => [cle, 0]));
-    for (const { cle } of MESURES) totaux[ligne.source][cle] += ligne[cle];
-  }
+function svg(balise, attributs = {}, enfants = []) {
+  const noeud = document.createElementNS(SVG, balise);
+  for (const [nom, valeur] of Object.entries(attributs)) noeud.setAttribute(nom, valeur);
+  for (const enfant of [].concat(enfants)) if (enfant != null) noeud.append(enfant);
+  return noeud;
+}
 
+// Pas « rond » et entier (1, 2, 5 × 10^n) pour environ 4 graduations jusqu'à max.
+function pasGraduation(max) {
+  const brut = Math.max(max / 4, 1);
+  const puissance = 10 ** Math.floor(Math.log10(brut));
+  return [1, 2, 5, 10].map((m) => m * puissance).find((pas) => pas >= brut);
+}
+
+// Rectangle aux coins du haut arrondis (bout de barre), carré sur la base.
+function barreArrondie(x, y, largeur, hauteur, rayon) {
+  const r = Math.min(rayon, largeur / 2, hauteur);
+  return `M${x},${y + hauteur}V${y + r}Q${x},${y} ${x + r},${y}H${x + largeur - r}` +
+    `Q${x + largeur},${y} ${x + largeur},${y + r}V${y + hauteur}Z`;
+}
+
+// Segments disjoints d'une barre, de la base vers le haut : retenues,
+// sélectionnées non retenues, puis le reste des collectées. La barre mesure
+// donc les collectées. Les annonces évaluées par l'équipe sont affichées même
+// non sélectionnées : le segment du milieu ne descend pas sous zéro.
+function segments(valeurs) {
+  const retenues = valeurs.affichees;
+  const selection = Math.max(valeurs.analysees_llm - retenues, 0);
+  return [
+    { mesure: MESURES[2], n: retenues },
+    { mesure: MESURES[1], n: selection },
+    { mesure: MESURES[0], n: Math.max(valeurs.recuperees - retenues - selection, 0) },
+  ];
+}
+
+const ECART = 2; // espace blanc entre segments empilés
+const MARGES = { haut: 10, droite: 24, bas: 24, gauche: 40 };
+const HAUTEUR_GRAPHIQUE = 190;
+
+function graphique(titre, jours, donnees, largeur) {
+  const total = donnees.reduce((somme, v) => somme + v.recuperees, 0);
+  const carte = el("div", { className: "graphique" }, [
+    el("div", { className: "titre-graphique" }, [
+      el("span", { textContent: titre }),
+      el("span", { className: "gris", textContent: ` — ${total} annonce${total > 1 ? "s" : ""} collectée${total > 1 ? "s" : ""}` }),
+    ]),
+  ]);
+  const largeurTrace = largeur - MARGES.gauche - MARGES.droite;
+  const hauteurTrace = HAUTEUR_GRAPHIQUE - MARGES.haut - MARGES.bas;
+  const pas = pasGraduation(Math.max(...donnees.map((v) => v.recuperees)));
+  const maxY = pas * Math.ceil(Math.max(...donnees.map((v) => v.recuperees), 1) / pas);
+  const y = (n) => MARGES.haut + hauteurTrace * (1 - n / maxY);
+  const bande = largeurTrace / jours.length;
+  const largeurBarre = Math.min(24, bande * 0.7);
+  // Une date toutes les `tous` barres, pour qu'elles ne se chevauchent pas.
+  const tous = Math.ceil(jours.length / Math.max(1, Math.floor(largeurTrace / 48)));
+
+  const fond = svg("g");
+  const grille = svg("g");
+  for (let n = 0; n <= maxY; n += pas) {
+    grille.append(
+      svg("line", { x1: MARGES.gauche, x2: largeur - MARGES.droite, y1: y(n), y2: y(n), class: n ? "grille" : "base" }),
+      svg("text", { x: MARGES.gauche - 6, y: y(n), class: "graduation", "text-anchor": "end", "dominant-baseline": "middle" }, String(n)),
+    );
+  }
+  const barres = svg("g");
+  jours.forEach((jour, i) => {
+    const x0 = MARGES.gauche + i * bande;
+    const x = x0 + (bande - largeurBarre) / 2;
+    const zone = svg("rect", { x: x0, y: MARGES.haut, width: bande, height: hauteurTrace, class: "zone-survol" });
+    zone.addEventListener("pointerenter", (e) => montrerInfobulle(e, jour, donnees[i]));
+    zone.addEventListener("pointermove", placerInfobulle);
+    zone.addEventListener("pointerleave", cacherInfobulle);
+    fond.append(zone);
+
+    const visibles = segments(donnees[i]).filter((s) => s.n > 0);
+    let bas = y(0);
+    visibles.forEach((segment, j) => {
+      const haut = bas - (y(0) - y(segment.n));
+      // Écart blanc sous chaque segment sauf le premier, posé sur la base.
+      const debutSegment = j ? bas - ECART : bas;
+      const hauteur = debutSegment - haut;
+      if (hauteur > 0.5) {
+        const dernier = j === visibles.length - 1;
+        barres.append(dernier
+          ? svg("path", { d: barreArrondie(x, haut, largeurBarre, hauteur, 4), fill: segment.mesure.couleur })
+          : svg("rect", { x, y: haut, width: largeurBarre, height: hauteur, fill: segment.mesure.couleur }));
+      }
+      bas = haut;
+    });
+    // Dates comptées depuis la plus récente, toujours affichée.
+    if ((jours.length - 1 - i) % tous === 0) {
+      barres.append(svg("text", { x: x0 + bande / 2, y: HAUTEUR_GRAPHIQUE - 6, class: "graduation", "text-anchor": "middle" },
+        formaterDate(jour).slice(0, 5)));
+    }
+  });
+  carte.append(svg("svg", {
+    width: largeur, height: HAUTEUR_GRAPHIQUE, role: "img",
+    "aria-label": `${titre} : annonces collectées, sélectionnées et retenues par jour`,
+  }, [fond, grille, barres]));
+  return carte;
+}
+
+// --- Infobulle (une pour tous les graphiques) ---
+
+function montrerInfobulle(evenement, jour, valeurs) {
+  const bulle = $("infobulle-statistiques");
+  bulle.replaceChildren(
+    el("div", { className: "jour", textContent: formaterDate(jour) }),
+    ...MESURES.map(({ cle, libelle, couleur }) => {
+      const trait = el("span", { className: "trait" });
+      trait.style.background = couleur;
+      return el("div", { className: "ligne-infobulle" }, [
+        trait, el("strong", { textContent: String(valeurs[cle]) }), el("span", { className: "gris", textContent: libelle }),
+      ]);
+    }),
+  );
+  bulle.hidden = false;
+  placerInfobulle(evenement);
+}
+
+function placerInfobulle(evenement) {
+  const bulle = $("infobulle-statistiques");
+  // Sous le pointeur, au-dessus s'il manque de place en bas ; jamais hors de la fenêtre.
+  const x = Math.min(evenement.clientX + 14, window.innerWidth - bulle.offsetWidth - 8);
+  const dessous = evenement.clientY + 14;
+  const y = dessous + bulle.offsetHeight > window.innerHeight - 8 ? evenement.clientY - bulle.offsetHeight - 14 : dessous;
+  bulle.style.left = `${x}px`;
+  bulle.style.top = `${Math.max(y, 8)}px`;
+}
+
+function cacherInfobulle() {
+  $("infobulle-statistiques").hidden = true;
+}
+
+// Tableau des chiffres (replié) : une ligne par jour, trois colonnes par source.
+function tableauStatistiques(jours, parSource) {
+  const cellules = (valeurs) => MESURES.map(({ cle }, i) => el("td", {
+    className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: String(valeurs[cle]),
+  }));
+  const somme = (liste) => liste.reduce((t, v) => {
+    for (const { cle } of MESURES) t[cle] += v[cle];
+    return t;
+  }, vides());
+  const cles = ["total", ...ORDRE_SOURCES];
+  const libelle = (cle) => (cle === "total" ? "Toutes sources" : SOURCES[cle].libelle);
   $("entetes-statistiques").replaceChildren(
     el("tr", {}, [
       el("th", { rowSpan: 2, textContent: "Jour" }),
-      ...ORDRE_SOURCES.map((cle) => el("th", { colSpan: MESURES.length, className: "debut-groupe", textContent: SOURCES[cle].libelle })),
+      ...cles.map((cle) => el("th", { colSpan: MESURES.length, className: "debut-groupe", textContent: libelle(cle) })),
     ]),
-    el("tr", {}, ORDRE_SOURCES.flatMap(() => MESURES.map(({ libelle, titre }, i) =>
-      el("th", { className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: libelle, title: titre })))),
+    el("tr", {}, cles.flatMap(() => MESURES.map(({ libelle: nom, titre }, i) =>
+      el("th", { className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: nom, title: titre })))),
   );
-  const jours = [...parJour.keys()].sort().reverse();
   $("lignes-statistiques").replaceChildren(
-    el("tr", { className: "total" }, [
-      el("td", { textContent: "Total" }),
-      ...ORDRE_SOURCES.flatMap((cle) => cellulesMesures(totaux[cle])),
-    ]),
-    ...jours.map((jour) => el("tr", {}, [
-      el("td", { textContent: formaterDate(jour) }),
-      ...ORDRE_SOURCES.flatMap((cle) => cellulesMesures(parJour.get(jour)[cle])),
+    el("tr", { className: "total" }, [el("td", { textContent: "Total" }), ...cles.flatMap((cle) => cellules(somme(parSource[cle])))]),
+    ...jours.map((jour, i) => i).reverse().map((i) => el("tr", {}, [
+      el("td", { textContent: formaterDate(jours[i]) }),
+      ...cles.flatMap((cle) => cellules(parSource[cle][i])),
     ])),
   );
 }
+
+function afficherStatistiques() {
+  const { erreur, charge } = statistiques;
+  if (erreur || !charge) {
+    $("compteur-statistiques").textContent = erreur ? `Erreur de chargement : ${erreur}` : "Chargement…";
+    $("graphiques-statistiques").replaceChildren();
+    return;
+  }
+  $("compteur-statistiques").textContent =
+    `Par jour de publication, sur les ${JOURS_STATISTIQUES} derniers jours. Chaque barre mesure les annonces ` +
+    "collectées ; les sélectionnées (envoyées au LLM) et les retenues (affichées) en sont une partie. Les annonces " +
+    "dont la date limite est dépassée depuis plus d'un mois sont supprimées de la base : les jours anciens diminuent avec le temps.";
+  const jours = Array.from({ length: JOURS_STATISTIQUES }, (_, i) => ilYa(JOURS_STATISTIQUES - 1 - i));
+  const parSource = series(jours);
+  tableauStatistiques(jours, parSource);
+
+  // Graphiques dessinés à la largeur de l'onglet : seulement s'il est visible
+  // (choisirOnglet les redessine à l'ouverture, et le redimensionnement aussi).
+  const largeur = $("graphiques-statistiques").clientWidth;
+  if (!largeur) return;
+  $("graphiques-statistiques").replaceChildren(
+    graphique("Toutes sources", jours, parSource.total, largeur),
+    ...ORDRE_SOURCES.map((cle) => graphique(SOURCES[cle].libelle, jours, parSource[cle], largeur)),
+  );
+}
+
+window.addEventListener("resize", () => {
+  if (!$("onglet-statistiques").hidden) afficherStatistiques();
+});
 
 // --- Onglets ----------------------------------------------------------------
 
@@ -1147,6 +1315,7 @@ function choisirOnglet(cle) {
   }
   history.replaceState(null, "", cle === "annonces" ? location.pathname : `#${cle}`);
   fermerPanneau();
+  if (cle === "statistiques") afficherStatistiques();
 }
 
 for (const bouton of document.querySelectorAll(".onglets button")) {
