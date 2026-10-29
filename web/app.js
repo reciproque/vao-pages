@@ -1175,7 +1175,8 @@ function graphique(titre, jours, donnees, largeur, mesures = MESURES) {
   }
   const barres = svg("g");
   jours.forEach((jour, i) => {
-    const x0 = MARGES.gauche + i * bande;
+    // Le jour le plus récent à gauche, comme dans le tableau des chiffres.
+    const x0 = MARGES.gauche + (jours.length - 1 - i) * bande;
     const x = x0 + (bande - largeurBarre) / 2;
     const zone = svg("rect", { x: x0, y: MARGES.haut, width: bande, height: hauteurTrace, class: "zone-survol" });
     zone.addEventListener("pointerenter", (e) => montrerInfobulle(e, jour, donnees[i], mesures));
