@@ -1241,58 +1241,45 @@ function cacherInfobulle() {
   $("infobulle-statistiques").hidden = true;
 }
 
-// Tableau des chiffres (replié) : une ligne par jour, quatre colonnes par source (COLONNES_CHIFFRES).
 // « 4,2 % », ou un tiret si le dénominateur est nul.
 function pourcentage(n, total) {
   return total ? `${(100 * n / total).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %` : VIDE;
 }
 
-// Ligne « Ratio » sous les totaux d'une source : rien sous les collectées,
-// sélectionnées / collectées, retenues / collectées et retenues / sélectionnées,
-// puis pertinentes / collectées et pertinentes / retenues.
-function cellulesRatio(t) {
-  const ligne = (texte, precision) => el("div", {}, [texte, el("span", { className: "gris", textContent: ` ${precision}` })]);
-  return [
-    el("td", { className: "nombre debut-groupe" }),
-    el("td", { className: "nombre" }, ligne(pourcentage(t.analysees_llm, t.recuperees), "des coll.")),
-    el("td", { className: "nombre" }, [
-      ligne(pourcentage(t.affichees, t.recuperees), "des coll."),
-      ligne(pourcentage(t.affichees, t.analysees_llm), "des sél."),
-    ]),
-    el("td", { className: "nombre" }, [
-      ligne(pourcentage(t.pertinentes, t.recuperees), "des coll."),
-      ligne(pourcentage(t.pertinentes, t.affichees), "des ret."),
-    ]),
-  ];
-}
+// Ratios de chaque ligne (colonne « Ratio ») : rien pour les collectées,
+// sélectionnées / collectées, retenues / collectées et / sélectionnées,
+// pertinentes / collectées et / retenues. [numérateur, dénominateur, précision].
+const RATIOS = {
+  recuperees: [],
+  analysees_llm: [["analysees_llm", "recuperees", "des coll."]],
+  affichees: [["affichees", "recuperees", "des coll."], ["affichees", "analysees_llm", "des sél."]],
+  pertinentes: [["pertinentes", "recuperees", "des coll."], ["pertinentes", "affichees", "des ret."]],
+};
 
-function tableauStatistiques(jours, parSource) {
-  const cellules = (valeurs) => COLONNES_CHIFFRES.map(({ cle }, i) => el("td", {
-    className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: String(valeurs[cle]),
-  }));
-  const somme = (liste) => liste.reduce((t, v) => {
+// Tableau des chiffres, toutes sources réunies : une ligne par mesure
+// (COLONNES_CHIFFRES), puis le total et les ratios de la période, puis une
+// colonne par jour, le plus récent d'abord.
+function tableauStatistiques(jours, total) {
+  const totaux = total.reduce((t, v) => {
     for (const { cle } of COLONNES_CHIFFRES) t[cle] += v[cle];
     return t;
   }, vides());
-  const cles = ["total", ...ORDRE_SOURCES];
-  const libelle = (cle) => (cle === "total" ? "Toutes sources" : SOURCES[cle].libelle);
-  $("entetes-statistiques").replaceChildren(
-    el("tr", {}, [
-      el("th", { rowSpan: 2, textContent: "Jour" }),
-      ...cles.map((cle) => el("th", { colSpan: COLONNES_CHIFFRES.length, className: "debut-groupe", textContent: libelle(cle) })),
-    ]),
-    el("tr", {}, cles.flatMap(() => COLONNES_CHIFFRES.map(({ libelle: nom, titre }, i) =>
-      el("th", { className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: nom, title: titre })))),
-  );
-  const totaux = Object.fromEntries(cles.map((cle) => [cle, somme(parSource[cle])]));
-  $("lignes-statistiques").replaceChildren(
-    el("tr", { className: "total" }, [el("td", { textContent: "Total" }), ...cles.flatMap((cle) => cellules(totaux[cle]))]),
-    el("tr", { className: "ratio" }, [el("td", { textContent: "Ratio" }), ...cles.flatMap((cle) => cellulesRatio(totaux[cle]))]),
-    ...jours.map((jour, i) => i).reverse().map((i) => el("tr", {}, [
-      el("td", { textContent: formaterDate(jours[i]) }),
-      ...cles.flatMap((cle) => cellules(parSource[cle][i])),
-    ])),
-  );
+  const ordre = jours.map((_, i) => i).reverse();
+  const ratio = (cle) => RATIOS[cle].map(([n, d, precision]) => el("div", {}, [
+    pourcentage(totaux[n], totaux[d]), el("span", { className: "gris", textContent: ` ${precision}` }),
+  ]));
+  $("entetes-statistiques").replaceChildren(el("tr", {}, [
+    el("th", { textContent: "Toutes sources" }),
+    el("th", { className: "nombre total", textContent: "Total" }),
+    el("th", { className: "nombre ratio", textContent: "Ratio" }),
+    ...ordre.map((i) => el("th", { className: "nombre", textContent: formaterDate(jours[i]).slice(0, 5) })),
+  ]));
+  $("lignes-statistiques").replaceChildren(...COLONNES_CHIFFRES.map(({ cle, libelle, titre }) => el("tr", {}, [
+    el("td", { className: "mesure", textContent: libelle, title: titre }),
+    el("td", { className: "nombre total", textContent: String(totaux[cle]) }),
+    el("td", { className: "nombre ratio" }, ratio(cle)),
+    ...ordre.map((i) => el("td", { className: "nombre", textContent: String(total[i][cle]) })),
+  ])));
 }
 
 function afficherStatistiques() {
@@ -1310,7 +1297,7 @@ function afficherStatistiques() {
   }));
   const jours = Array.from({ length: JOURS_STATISTIQUES }, (_, i) => ilYa(JOURS_STATISTIQUES - 1 - i));
   const parSource = series(jours);
-  tableauStatistiques(jours, parSource);
+  tableauStatistiques(jours, parSource.total);
 
   // Graphiques dessinés à la largeur de l'onglet : seulement s'il est visible
   // (choisirOnglet les redessine à l'ouverture, et le redimensionnement aussi).
