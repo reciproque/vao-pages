@@ -258,9 +258,9 @@ const SOURCES = {
 };
 const ORDRE_SOURCES = Object.keys(SOURCES);
 
-// Chargement par source : annonces, ligne « Dernière ingestion », erreur.
+// Chargement par source : annonces, erreur.
 const etat = Object.fromEntries(ORDRE_SOURCES.map((cle) => [cle, {
-  annonces: [], nouveautes: [], erreur: null, charge: false,
+  annonces: [], erreur: null, charge: false,
 }]));
 // Annonces de toutes les sources chargées, dans l'ordre de comparer.
 let annonces = [];
@@ -693,11 +693,6 @@ function lignesAnnonce(annonce) {
 
 function afficher() {
   afficherEntetes(); // état des tris et filtres
-  // Une ligne « Dernière ingestion » par source chargée.
-  $("nouveautes").replaceChildren(...ORDRE_SOURCES
-    .filter((cle) => etat[cle].nouveautes.length)
-    .map((cle) => el("div", {}, [el("span", { className: "nom-source", textContent: SOURCES[cle].libelle }), ...etat[cle].nouveautes])));
-
   const erreurs = ORDRE_SOURCES.filter((cle) => etat[cle].erreur).map((cle) =>
     el("div", { className: "erreur", textContent: `Erreur de chargement ${SOURCES[cle].libelle} : ${etat[cle].erreur}` }));
   const enCours = ORDRE_SOURCES.filter((cle) => !etat[cle].charge && !etat[cle].erreur);
@@ -722,30 +717,6 @@ function afficher() {
 
 // --- Données ----------------------------------------------------------------
 
-// Dernière ingestion : date de parution la plus récente de la table (même
-// curseur que veille.pipeline). Compte toutes les annonces collectées ce jour-là
-// (comptage côté Supabase, sans les télécharger) et, parmi elles, celles affichées.
-async function calculerNouveautes(cle) {
-  const { table } = SOURCES[cle];
-  const { data, error } = await client
-    .from(table)
-    .select("dateparution")
-    .not("dateparution", "is", null)
-    .order("dateparution", { ascending: false })
-    .limit(1);
-  const jour = data?.[0]?.dateparution;
-  if (error || !jour) return [];
-  const { count, error: erreurComptage } = await client
-    .from(table)
-    .select("idweb", { count: "exact", head: true })
-    .eq("dateparution", jour);
-  const retenues = etat[cle].annonces.filter((a) => a.dateparution === jour).length;
-  const enGras = el("strong", { textContent: `${retenues} retenues` });
-  // Date en gras : c'est elle qu'on regarde pour savoir si la source est à jour.
-  const debut = ["dernière ingestion le ", el("strong", { textContent: formaterDate(jour) }), " : "];
-  return erreurComptage ? [...debut, enGras] : [...debut, `${count} annonces collectées, dont `, enGras];
-}
-
 async function charger(cle) {
   const source = SOURCES[cle];
   const colonnes = [...COLONNES_COMMUNES, ...source.colonnes].join(",");
@@ -766,7 +737,6 @@ async function charger(cle) {
   for (const annonce of resultat) annonce.source = cle; // jamais renvoyé à Supabase
   etat[cle].annonces = resultat;
   etat[cle].charge = true;
-  etat[cle].nouveautes = await calculerNouveautes(cle);
 }
 
 function reunirAnnonces() {
@@ -777,7 +747,7 @@ function reunirAnnonces() {
 // l'affichage des autres.
 async function chargerTout() {
   await Promise.all(ORDRE_SOURCES.map(async (cle) => {
-    Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
+    Object.assign(etat[cle], { annonces: [], erreur: null, charge: false });
     try {
       await charger(cle);
     } catch (erreur) {
@@ -1337,7 +1307,7 @@ for (const bouton of document.querySelectorAll(".onglets button")) {
 
 function viderDonnees() {
   for (const cle of ORDRE_SOURCES) {
-    Object.assign(etat[cle], { annonces: [], nouveautes: [], erreur: null, charge: false });
+    Object.assign(etat[cle], { annonces: [], erreur: null, charge: false });
   }
   annonces = [];
   Object.assign(veille, { profils: [], villes: new Map(), erreur: null, charge: false, depuis: null });
