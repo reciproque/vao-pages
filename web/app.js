@@ -1066,9 +1066,9 @@ const JOURS_STATISTIQUES = 30;
 // du clair au foncé (validée : ordre de clarté, écarts visibles, contraste du
 // plus clair sur fond blanc).
 const MESURES = [
-  { cle: "recuperees", libelle: "Collectées", titre: "Enregistrées en base après les filtres de collecte", couleur: "#86b6ef" },
-  { cle: "analysees_llm", libelle: "Sélectionnées", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#2a78d6" },
-  { cle: "affichees", libelle: "Retenues", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#104281" },
+  { cle: "recuperees", libelle: "Collectées", titre: "Enregistrées en base après les filtres de collecte", couleur: "#efad86" },
+  { cle: "analysees_llm", libelle: "Sélectionnées", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#9f5c35" },
+  { cle: "affichees", libelle: "Retenues", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#59371b" },
 ];
 
 const statistiques = { lignes: [], erreur: null, charge: false };
@@ -1146,7 +1146,6 @@ function segments(valeurs) {
   ];
 }
 
-const ECART = 2; // espace blanc entre segments empilés
 const MARGES = { haut: 10, droite: 24, bas: 24, gauche: 40 };
 const HAUTEUR_GRAPHIQUE = 190;
 
@@ -1186,20 +1185,18 @@ function graphique(titre, jours, donnees, largeur) {
     zone.addEventListener("pointerleave", cacherInfobulle);
     fond.append(zone);
 
+    // Segments jointifs, sans espace entre eux : chacun est dessiné de la base
+    // jusqu'à son sommet cumulé, du plus haut au plus bas, chaque segment
+    // recouvrant le bas du précédent (pas de liseré d'anticrénelage entre deux).
     const visibles = segments(donnees[i]).filter((s) => s.n > 0);
-    let bas = y(0);
-    visibles.forEach((segment, j) => {
-      const haut = bas - (y(0) - y(segment.n));
-      // Écart blanc sous chaque segment sauf le premier, posé sur la base.
-      const debutSegment = j ? bas - ECART : bas;
-      const hauteur = debutSegment - haut;
-      if (hauteur > 0.5) {
-        const dernier = j === visibles.length - 1;
-        barres.append(dernier
-          ? svg("path", { d: barreArrondie(x, haut, largeurBarre, hauteur, 4), fill: segment.mesure.couleur })
-          : svg("rect", { x, y: haut, width: largeurBarre, height: hauteur, fill: segment.mesure.couleur }));
-      }
-      bas = haut;
+    let cumul = visibles.reduce((somme, s) => somme + s.n, 0);
+    visibles.slice().reverse().forEach((segment, j) => {
+      const haut = y(cumul);
+      const hauteur = y(0) - haut;
+      barres.append(j === 0
+        ? svg("path", { d: barreArrondie(x, haut, largeurBarre, hauteur, 4), fill: segment.mesure.couleur })
+        : svg("rect", { x, y: haut, width: largeurBarre, height: hauteur, fill: segment.mesure.couleur }));
+      cumul -= segment.n;
     });
     // Dates comptées depuis la plus récente, toujours affichée.
     if ((jours.length - 1 - i) % tous === 0) {
@@ -1282,9 +1279,7 @@ function afficherStatistiques() {
     return;
   }
   $("compteur-statistiques").textContent =
-    `Par jour de publication, sur les ${JOURS_STATISTIQUES} derniers jours. Chaque barre mesure les annonces ` +
-    "collectées ; les sélectionnées (envoyées au LLM) et les retenues (affichées) en sont une partie. Les annonces " +
-    "dont la date limite est dépassée depuis plus d'un mois sont supprimées de la base : les jours anciens diminuent avec le temps.";
+    `Par jour de publication, sur les ${JOURS_STATISTIQUES} derniers jours. Chaque barre mesure les annonces `;
   const jours = Array.from({ length: JOURS_STATISTIQUES }, (_, i) => ilYa(JOURS_STATISTIQUES - 1 - i));
   const parSource = series(jours);
   tableauStatistiques(jours, parSource);
