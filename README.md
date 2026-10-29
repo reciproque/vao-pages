@@ -1,7 +1,7 @@
 # Veille appels d'offres — page de suivi (reciproque)
 
 Page web de suivi des appels d'offres sélectionnés chaque matin par la
-pipeline de veille de reciproque (sources BOAMP et TED). La pipeline vit dans
+pipeline de veille de Reciproque (sources BOAMP, TED et autres). La pipeline vit dans
 un dépôt privé ; ce dépôt public ne contient que la page.
 
 **Page :** https://reciproque.github.io/vao-pages/
@@ -11,7 +11,7 @@ un dépôt privé ; ce dépôt public ne contient que la page.
 
 Trois fichiers, sans étape de build : [`web/index.html`](web/index.html)
 (structure), [`web/style.css`](web/style.css) (styles) et
-[`web/app.js`](web/app.js) (code). Elle lit directement les tables Supabase `annonces_boamp`, `annonces_ted` et `annonces_place` (un
+[`web/app.js`](web/app.js) (code). Elle lit directement les tables Supabase (un
 onglet par source) : rien n'est régénéré, les nouvelles annonces apparaissent
 dès que la pipeline a tourné.
 
