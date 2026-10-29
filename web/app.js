@@ -57,9 +57,10 @@ function formaterDate(valeur, avecHeure = false) {
   return date.toLocaleString("fr-FR", options);
 }
 
-// Date du jour (heure locale) au format AAAA-MM-JJ.
-function aujourdhui() {
+// Date d'il y a `jours` jours (heure locale), au format AAAA-MM-JJ.
+function ilYa(jours) {
   const d = new Date();
+  d.setDate(d.getDate() - jours);
   return [d.getFullYear(), d.getMonth() + 1, d.getDate()]
     .map((n) => String(n).padStart(2, "0")).join("-");
 }
@@ -861,10 +862,7 @@ function comparerProfils(a, b) {
 
 async function chargerVeille() {
   Object.assign(veille, { profils: [], villes: new Map(), erreur: null, charge: false });
-  const depuis = new Date();
-  depuis.setDate(depuis.getDate() - JOURS_HISTORIQUE_VEILLE);
-  const jourDepuis = [depuis.getFullYear(), depuis.getMonth() + 1, depuis.getDate()]
-    .map((n) => String(n).padStart(2, "0")).join("-");
+  const jourDepuis = ilYa(JOURS_HISTORIQUE_VEILLE);
   try {
     // Dernier relevé vu de chaque profil : les nouveautés se comptent depuis
     // celui-là, même s'il est plus ancien que la période affichée.
@@ -1054,9 +1052,92 @@ function afficherVeille() {
   $("lignes-veille").replaceChildren(...profils.map(ligneProfil));
 }
 
+// --- Onglet « Statistiques » ------------------------------------------------
+// Vue statistiques_quotidiennes (sql/schema_supabase.sql du dépôt de la
+// pipeline) : par source et par jour de publication, annonces enregistrées,
+// envoyées au LLM (rapporte) et affichées (même règle que la page).
+
+const VUE_STATISTIQUES = "statistiques_quotidiennes";
+const JOURS_STATISTIQUES = 30;
+const MESURES = [
+  { cle: "recuperees", libelle: "Récupérées", titre: "Enregistrées en base après les filtres de collecte" },
+  { cle: "analysees_llm", libelle: "LLM", titre: "Retenues par le seuil de score, envoyées au LLM" },
+  { cle: "affichees", libelle: "Affichées", titre: "Visibles dans l'onglet Appels d'offres" },
+];
+
+const statistiques = { lignes: [], erreur: null, charge: false };
+
+async function chargerStatistiques() {
+  Object.assign(statistiques, { lignes: [], erreur: null, charge: false });
+  try {
+    const { data, error } = await client
+      .from(VUE_STATISTIQUES)
+      .select("source,jour,recuperees,analysees_llm,affichees")
+      .gte("jour", ilYa(JOURS_STATISTIQUES))
+      .range(0, TAILLE_PAGE - 1);
+    if (error) throw error;
+    statistiques.lignes = data;
+    statistiques.charge = true;
+  } catch (erreur) {
+    statistiques.erreur = erreur.message;
+  }
+  afficherStatistiques();
+}
+
+// Cellules des trois mesures d'une source ; la première ouvre le groupe.
+function cellulesMesures(valeurs) {
+  return MESURES.map(({ cle }, i) => el("td", {
+    className: `nombre${i === 0 ? " debut-groupe" : ""}`,
+    textContent: valeurs ? String(valeurs[cle]) : "",
+  }));
+}
+
+function afficherStatistiques() {
+  const { lignes, erreur, charge } = statistiques;
+  if (erreur || !charge) {
+    $("compteur-statistiques").textContent = erreur ? `Erreur de chargement : ${erreur}` : "Chargement…";
+    $("entetes-statistiques").replaceChildren();
+    $("lignes-statistiques").replaceChildren();
+    return;
+  }
+  $("compteur-statistiques").textContent =
+    `Par jour de publication, sur les ${JOURS_STATISTIQUES} derniers jours. Les annonces dont la date limite ` +
+    "est dépassée depuis plus d'un mois sont supprimées de la base : les jours anciens diminuent avec le temps.";
+
+  // jour -> source -> mesures ; total par source sur la période.
+  const parJour = new Map();
+  const totaux = {};
+  for (const ligne of lignes) {
+    if (!parJour.has(ligne.jour)) parJour.set(ligne.jour, {});
+    parJour.get(ligne.jour)[ligne.source] = ligne;
+    totaux[ligne.source] ??= Object.fromEntries(MESURES.map(({ cle }) => [cle, 0]));
+    for (const { cle } of MESURES) totaux[ligne.source][cle] += ligne[cle];
+  }
+
+  $("entetes-statistiques").replaceChildren(
+    el("tr", {}, [
+      el("th", { rowSpan: 2, textContent: "Jour" }),
+      ...ORDRE_SOURCES.map((cle) => el("th", { colSpan: MESURES.length, className: "debut-groupe", textContent: SOURCES[cle].libelle })),
+    ]),
+    el("tr", {}, ORDRE_SOURCES.flatMap(() => MESURES.map(({ libelle, titre }, i) =>
+      el("th", { className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: libelle, title: titre })))),
+  );
+  const jours = [...parJour.keys()].sort().reverse();
+  $("lignes-statistiques").replaceChildren(
+    el("tr", { className: "total" }, [
+      el("td", { textContent: "Total" }),
+      ...ORDRE_SOURCES.flatMap((cle) => cellulesMesures(totaux[cle])),
+    ]),
+    ...jours.map((jour) => el("tr", {}, [
+      el("td", { textContent: formaterDate(jour) }),
+      ...ORDRE_SOURCES.flatMap((cle) => cellulesMesures(parJour.get(jour)[cle])),
+    ])),
+  );
+}
+
 // --- Onglets ----------------------------------------------------------------
 
-const ONGLETS = ["annonces", "veille-ciblee"];
+const ONGLETS = ["annonces", "veille-ciblee", "statistiques"];
 
 // Onglet retenu dans l'adresse (#veille-ciblee) : rechargement et lien partageable.
 function choisirOnglet(cle) {
@@ -1080,6 +1161,7 @@ function viderDonnees() {
   }
   annonces = [];
   Object.assign(veille, { profils: [], villes: new Map(), erreur: null, charge: false, depuis: null });
+  Object.assign(statistiques, { lignes: [], erreur: null, charge: false });
 }
 
 async function afficherSelonSession(session) {
@@ -1093,7 +1175,8 @@ async function afficherSelonSession(session) {
   choisirOnglet(ONGLETS.includes(ancre) ? ancre : "annonces");
   afficher();
   afficherVeille();
-  await Promise.all([chargerTout(), chargerVeille()]);
+  afficherStatistiques();
+  await Promise.all([chargerTout(), chargerVeille(), chargerStatistiques()]);
 }
 
 $("connexion").addEventListener("submit", async (evenement) => {

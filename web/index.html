@@ -7,12 +7,14 @@
 <!--
   Page de suivi des annonces retenues par la pipeline, réunies dans un seul
   tableau (colonne « Source ») : BOAMP (table annonces_boamp), TED (table
-  annonces_ted), PLACE (table annonces_place, alertes mail de
-  marches-publics.gouv.fr) et AWS (table annonces_aws, alertes mail de
-  marches-publics.info). Chaque source est décrite dans SOURCES (table,
+  annonces_ted), Simap (table annonces_simap, appels d'offres suisses),
+  PLACE (table annonces_place, alertes mail de marches-publics.gouv.fr) et
+  AWS (table annonces_aws, alertes mail de marches-publics.info). Chaque source est décrite dans SOURCES (table,
   colonnes, lecture de ses champs) ; le reste est commun.
   Onglet « Veille ciblée » : relevés de la veille des profils acheteurs (table
   veille_profils : Dematis, achatpublic, sites d'institutions), case « Vue » par profil.
+  Onglet « Statistiques » : par source et par jour, annonces récupérées,
+  envoyées au LLM et affichées (vue statistiques_quotidiennes).
 
   Lit directement les tables dans Supabase (aucune régénération quotidienne) :
   annonces marquées `rapporte` dont la note LLM est absente ou strictement
@@ -24,7 +26,7 @@
   La clé anon/publishable (app.js) est publique par conception : sans
   connexion, elle ne donne accès à rien. Styles dans style.css, code dans app.js.
 -->
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -48,6 +50,7 @@
   <div class="onglets" role="tablist">
     <button type="button" role="tab" data-onglet="annonces">Appels d'offres</button>
     <button type="button" role="tab" data-onglet="veille-ciblee">Veille ciblée</button>
+    <button type="button" role="tab" data-onglet="statistiques">Statistiques</button>
   </div>
 
   <section id="onglet-annonces">
@@ -87,8 +90,18 @@
     </table>
   </div>
   </section>
+
+  <section id="onglet-statistiques" hidden>
+  <div class="sous-titre" id="compteur-statistiques">Chargement…</div>
+  <div class="conteneur-tableau">
+    <table class="tableau-statistiques">
+      <thead id="entetes-statistiques"></thead>
+      <tbody id="lignes-statistiques"></tbody>
+    </table>
+  </div>
+  </section>
 </main>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

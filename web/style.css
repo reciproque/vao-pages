@@ -128,6 +128,15 @@ th.col-nouveautes { min-width: 320px; }
 .nouveaute .jour { font-weight: 600; margin-right: 6px; }
 .erreur-veille { color: #c62828; margin-top: 4px; font-size: 13px; }
 
+/* Statistiques */
+#compteur-statistiques { margin-top: 16px; }
+table.tableau-statistiques { min-width: 900px; }
+.tableau-statistiques th, .tableau-statistiques td { padding: 8px 10px; white-space: nowrap; }
+.tableau-statistiques .nombre { text-align: right; font-variant-numeric: tabular-nums; }
+.tableau-statistiques .debut-groupe { border-left: 1px solid #d2d2d7; }
+.tableau-statistiques th.debut-groupe:not(.nombre) { text-align: center; }
+.tableau-statistiques tr.total td { font-weight: 600; background: #f9f9fb; }
+
 @media (max-width: 700px) {
   body { padding: 16px; }
 }
