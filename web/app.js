@@ -155,7 +155,7 @@ const PROCEDURES_SIMAP = {
 };
 
 // --- Sources ----------------------------------------------------------------
-// Les annonces des cinq tables sont réunies dans un seul tableau. Chaque
+// Les annonces des six tables sont réunies dans un seul tableau. Chaque
 // source dit comment lire ses colonnes :
 //   libelle        : nom affiché dans la colonne « Source » ;
 //   table          : table Supabase lue et modifiée ;
@@ -254,6 +254,23 @@ const SOURCES = {
     // Comme TED : description traduite pour les projets non francophones retenus.
     description: (a) => a.description_fr || a.description,
     recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.ville, a.libelles_cpv, a.libelle_cpc, a.description_fr || a.description],
+  },
+  safetender: {
+    libelle: "SafeTender",
+    table: "annonces_safetender",
+    colonnes: ["ville", "code_departement", "type_marche", "procedure_libelle", "description"],
+    // Lieu d'exécution (à défaut, adresse de l'acheteur) : ville et département.
+    detailAcheteur: (a) => [a.ville, a.code_departement && `(${a.code_departement})`].filter(Boolean).join(" "),
+    objet: (a) => a.objet,
+    pays: () => FRANCE,
+    categories: aucune,
+    // Libellés déjà en français (pipeline).
+    typeMarche: (a) => a.type_marche,
+    procedure: (a) => a.procedure_libelle,
+    departements: (a) => [a.code_departement],
+    // Presque toujours vide sur SafeTender.
+    description: (a) => a.description,
+    recherche: (a) => [a.objet, a.nomacheteur, a.ville, a.description],
   },
 };
 const ORDRE_SOURCES = Object.keys(SOURCES);
