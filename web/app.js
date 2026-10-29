@@ -1236,6 +1236,25 @@ function cacherInfobulle() {
 }
 
 // Tableau des chiffres (replié) : une ligne par jour, trois colonnes par source.
+// « 4,2 % », ou un tiret si le dénominateur est nul.
+function pourcentage(n, total) {
+  return total ? `${(100 * n / total).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %` : VIDE;
+}
+
+// Ligne « Ratio » sous les totaux d'une source : rien sous les collectées,
+// sélectionnées / collectées, puis retenues / collectées et retenues / sélectionnées.
+function cellulesRatio(t) {
+  const ligne = (texte, precision) => el("div", {}, [texte, el("span", { className: "gris", textContent: ` ${precision}` })]);
+  return [
+    el("td", { className: "nombre debut-groupe" }),
+    el("td", { className: "nombre" }, ligne(pourcentage(t.analysees_llm, t.recuperees), "des coll.")),
+    el("td", { className: "nombre" }, [
+      ligne(pourcentage(t.affichees, t.recuperees), "des coll."),
+      ligne(pourcentage(t.affichees, t.analysees_llm), "des sél."),
+    ]),
+  ];
+}
+
 function tableauStatistiques(jours, parSource) {
   const cellules = (valeurs) => MESURES.map(({ cle }, i) => el("td", {
     className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: String(valeurs[cle]),
@@ -1254,8 +1273,10 @@ function tableauStatistiques(jours, parSource) {
     el("tr", {}, cles.flatMap(() => MESURES.map(({ libelle: nom, titre }, i) =>
       el("th", { className: `nombre${i === 0 ? " debut-groupe" : ""}`, textContent: nom, title: titre })))),
   );
+  const totaux = Object.fromEntries(cles.map((cle) => [cle, somme(parSource[cle])]));
   $("lignes-statistiques").replaceChildren(
-    el("tr", { className: "total" }, [el("td", { textContent: "Total" }), ...cles.flatMap((cle) => cellules(somme(parSource[cle])))]),
+    el("tr", { className: "total" }, [el("td", { textContent: "Total" }), ...cles.flatMap((cle) => cellules(totaux[cle]))]),
+    el("tr", { className: "ratio" }, [el("td", { textContent: "Ratio" }), ...cles.flatMap((cle) => cellulesRatio(totaux[cle]))]),
     ...jours.map((jour, i) => i).reverse().map((i) => el("tr", {}, [
       el("td", { textContent: formaterDate(jours[i]) }),
       ...cles.flatMap((cle) => cellules(parSource[cle][i])),

@@ -134,6 +134,8 @@ table.tableau-statistiques { min-width: 900px; }
 .tableau-statistiques .debut-groupe { border-left: 1px solid #d2d2d7; }
 .tableau-statistiques th.debut-groupe { text-align: center; }
 .tableau-statistiques tr.total td { font-weight: 600; background: #f9f9fb; }
+.tableau-statistiques tr.ratio td { background: #f9f9fb; font-size: 13px; border-top: none; }
+.tableau-statistiques tr.ratio .gris { margin-top: 0; font-size: 12px; }
 .legende-statistiques { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: #555; margin-bottom: 12px; }
 .legende-statistiques .carre { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 #graphiques-statistiques { display: flex; flex-direction: column; gap: 12px; }
