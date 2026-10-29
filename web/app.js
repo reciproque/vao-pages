@@ -1092,11 +1092,22 @@ function svg(balise, attributs = {}, enfants = []) {
   return noeud;
 }
 
-// Pas « rond » et entier (1, 2, 5 × 10^n) pour environ 4 graduations jusqu'à max.
-function pasGraduation(max) {
-  const brut = Math.max(max / 4, 1);
-  const puissance = 10 ** Math.floor(Math.log10(brut));
-  return [1, 2, 5, 10].map((m) => m * puissance).find((pas) => pas >= brut);
+// Axe vertical : { pas, maxY }, la borne la plus basse au-dessus de max parmi
+// les pas « ronds » et entiers (1, 2, 2,5, 5 × 10^n) donnant 2 à 6 intervalles.
+// À borne égale, le nombre d'intervalles le plus proche de 4. Ex. : 101 -> 120
+// par 20 (et non 150 par 50), 177 -> 200 par 50, 217 -> 250 par 50.
+function axeVertical(max) {
+  max = Math.max(max, 1);
+  const candidats = [];
+  for (let puissance = 1; puissance <= max; puissance *= 10) {
+    for (const m of [1, 2, 2.5, 5]) {
+      const pas = m * puissance;
+      const intervalles = Math.ceil(max / pas);
+      if (Number.isInteger(pas) && intervalles >= 2 && intervalles <= 6) candidats.push({ pas, maxY: pas * intervalles, intervalles });
+    }
+  }
+  candidats.sort((a, b) => a.maxY - b.maxY || Math.abs(a.intervalles - 4) - Math.abs(b.intervalles - 4));
+  return candidats[0] ?? { pas: 1, maxY: Math.max(2, Math.ceil(max)) };
 }
 
 // Rectangle aux coins du haut arrondis (bout de barre), carré sur la base.
@@ -1141,8 +1152,7 @@ function graphique(titre, jours, donnees, largeur, mesures = MESURES) {
   const largeurTrace = largeur - MARGES.gauche - MARGES.droite;
   const hauteurTrace = HAUTEUR_GRAPHIQUE - MARGES.haut - MARGES.bas;
   const hauteurs = donnees.map((v) => hauteurBarre(v, mesures));
-  const pas = pasGraduation(Math.max(...hauteurs));
-  const maxY = pas * Math.ceil(Math.max(...hauteurs, 1) / pas);
+  const { pas, maxY } = axeVertical(Math.max(...hauteurs));
   const y = (n) => MARGES.haut + hauteurTrace * (1 - n / maxY);
   const bande = largeurTrace / jours.length;
   const largeurBarre = Math.min(24, bande * 0.7);
