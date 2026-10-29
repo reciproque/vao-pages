@@ -1028,8 +1028,8 @@ function afficherVeille() {
 // (enregistrées en base), sélectionnées (rapporte, envoyées au LLM) et
 // retenues (affichées, même règle que la page). Un graphique en barres
 // empilées pour l'ensemble des sources (sélectionnées et retenues seulement),
-// puis un par source (les trois étapes) ; les chiffres sont aussi dans un
-// tableau replié sous les graphiques.
+// puis un par source (les trois étapes) ; les chiffres de l'ensemble des
+// sources sont dans un tableau, entre le premier graphique et les autres.
 
 const VUE_STATISTIQUES = "statistiques_quotidiennes";
 const JOURS_STATISTIQUES = 20;
@@ -1286,6 +1286,7 @@ function afficherStatistiques() {
   const { erreur, charge } = statistiques;
   if (erreur || !charge) {
     $("compteur-statistiques").textContent = erreur ? `Erreur de chargement : ${erreur}` : "Chargement…";
+    $("graphique-total").replaceChildren();
     $("graphiques-statistiques").replaceChildren();
     return;
   }
@@ -1303,8 +1304,10 @@ function afficherStatistiques() {
   // (choisirOnglet les redessine à l'ouverture, et le redimensionnement aussi).
   const largeur = $("graphiques-statistiques").clientWidth;
   if (!largeur) return;
-  $("graphiques-statistiques").replaceChildren(
+  $("graphique-total").replaceChildren(
     graphique("Toutes sources", jours, parSource.total, largeur, MESURES_TOTAL),
+  );
+  $("graphiques-statistiques").replaceChildren(
     ...ORDRE_SOURCES.map((cle) => graphique(SOURCES[cle].libelle, jours, parSource[cle], largeur)),
   );
 }

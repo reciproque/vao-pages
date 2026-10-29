@@ -149,8 +149,7 @@ table.tableau-statistiques { min-width: 0; }
 .graphique .zone-survol { fill: transparent; }
 .graphique .zone-survol:hover { fill: rgba(0,0,0,0.04); }
 .graphique path, .graphique rect:not(.zone-survol), .graphique text { pointer-events: none; }
-.chiffres-statistiques { margin-top: 16px; }
-.chiffres-statistiques summary { color: #1565c0; font-weight: 500; cursor: pointer; width: fit-content; font-size: 14px; margin-bottom: 8px; }
+.chiffres-statistiques { margin: 12px 0; }
 .infobulle {
   position: fixed; z-index: 20; pointer-events: none; background: #fff; border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 8px 10px; font-size: 13px; line-height: 1.5;
