@@ -1059,10 +1059,10 @@ const JOURS_STATISTIQUES = 20;
 // qu'une partie.
 const MESURES = [
   { cle: "avant_dedoublonnage", libelle: "Collectées", legende: "Collectées (doublons compris)", titre: "Collectées après les filtres de collecte, doublons de BOAMP compris (TED, SafeTender, PLACE, AWS)", couleur: "#d5ac76" },
-  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#b78656" },
-  { cle: "analysees_llm", libelle: "Sélectionnées", legende: "Sélectionnées (envoyées au LLM)", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#814e29" },
-  { cle: "affichees", libelle: "Retenues", legende: "Retenues (affichées)", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#4a2511" },
-  { cle: "pertinentes", libelle: "Pertinentes", legende: "Pertinentes (équipe, toutes sources)", titre: "Notées « pertinent » par l'équipe", couleur: "#261208" },
+  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#bc8d5f" },
+  { cle: "analysees_llm", libelle: "Sélectionnées", legende: "Sélectionnées (envoyées au LLM)", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#976038" },
+  { cle: "affichees", libelle: "Retenues", legende: "Retenues (affichées)", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#62361f" },
+  { cle: "pertinentes", libelle: "Pertinentes", legende: "Pertinentes (équipe, toutes sources)", titre: "Notées « pertinent » par l'équipe", couleur: "#461f0b" },
 ];
 // Graphique par source : de collectées à retenues, sans les pertinentes.
 const MESURES_SOURCE = MESURES.slice(0, 4);
