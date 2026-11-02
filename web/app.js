@@ -1056,9 +1056,9 @@ const JOURS_STATISTIQUES = 20;
 // est sous 2:1 sur fond blanc, par choix : l'infobulle et le tableau donnent
 // les nombres. La légende est construite à partir de cette liste.
 const MESURES = [
-  { cle: "avant_dedoublonnage", libelle: "Collectées", legende: "Collectées (doublons compris)", titre: "Collectées après les filtres de collecte, doublons de BOAMP compris (TED, SafeTender, PLACE, AWS)", couleur: "#e8cba6" },
-  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#d4a373" },
-  { cle: "analysees_llm", libelle: "Sélectionnées", legende: "Sélectionnées (envoyées au LLM)", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#9a5b2e" },
+  { cle: "avant_dedoublonnage", libelle: "Collectées", legende: "Collectées (doublons compris)", titre: "Collectées après les filtres de collecte, doublons de BOAMP compris (TED, SafeTender, PLACE, AWS)", couleur: "#c39a66" },
+  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#a67a4e" },
+  { cle: "analysees_llm", libelle: "Sélectionnées", legende: "Sélectionnées (envoyées au LLM)", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#814e29" },
   { cle: "affichees", libelle: "Retenues", legende: "Retenues (affichées)", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#4a2511" },
 ];
 // Graphique « Toutes sources » : sans les collectées ni les uniques, qui écraseraient le reste.
