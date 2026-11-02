@@ -1052,23 +1052,25 @@ function afficherVeille() {
 const VUE_STATISTIQUES = "statistiques_quotidiennes";
 const JOURS_STATISTIQUES = 20;
 // Étapes emboîtées, de la plus large à la plus étroite. Rampe d'un seul brun
-// « cacao », du caramel très clair au chocolat. Le très clair (collectées)
-// est sous 2:1 sur fond blanc, par choix : l'infobulle et le tableau donnent
-// les nombres. La légende est construite à partir de cette liste.
+// « cacao », du caramel très clair au chocolat très foncé. Le très clair
+// (collectées) est sous 2:1 sur fond blanc, par choix : l'infobulle et le
+// tableau donnent les nombres. La légende, commune à tous les graphiques, est
+// construite à partir de cette liste, même si chaque graphique n'en montre
+// qu'une partie.
 const MESURES = [
-  { cle: "avant_dedoublonnage", libelle: "Collectées", legende: "Collectées (doublons compris)", titre: "Collectées après les filtres de collecte, doublons de BOAMP compris (TED, SafeTender, PLACE, AWS)", couleur: "#c39a66" },
-  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#a67a4e" },
+  { cle: "avant_dedoublonnage", libelle: "Collectées", legende: "Collectées (doublons compris)", titre: "Collectées après les filtres de collecte, doublons de BOAMP compris (TED, SafeTender, PLACE, AWS)", couleur: "#d5ac76" },
+  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#b78656" },
   { cle: "analysees_llm", libelle: "Sélectionnées", legende: "Sélectionnées (envoyées au LLM)", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#814e29" },
   { cle: "affichees", libelle: "Retenues", legende: "Retenues (affichées)", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#4a2511" },
+  { cle: "pertinentes", libelle: "Pertinentes", legende: "Pertinentes (équipe, toutes sources)", titre: "Notées « pertinent » par l'équipe", couleur: "#261208" },
 ];
-// Graphique « Toutes sources » : sans les collectées ni les uniques, qui écraseraient le reste.
+// Graphique par source : de collectées à retenues, sans les pertinentes.
+const MESURES_SOURCE = MESURES.slice(0, 4);
+// Graphique « Toutes sources » : sans les collectées ni les uniques, qui
+// écraseraient le reste, mais avec les pertinentes.
 const MESURES_TOTAL = MESURES.slice(2);
-// Colonnes du tableau des chiffres : les quatre étapes, plus les annonces notées
-// « pertinent » par l'équipe (pas dans les graphiques).
-const COLONNES_CHIFFRES = [
-  ...MESURES,
-  { cle: "pertinentes", libelle: "Pertinentes", titre: "Notées « pertinent » par l'équipe" },
-];
+// Colonnes du tableau des chiffres : toutes les étapes.
+const COLONNES_CHIFFRES = MESURES;
 
 const statistiques = { lignes: [], erreur: null, charge: false };
 
@@ -1142,17 +1144,20 @@ function barreArrondie(x, y, largeur, hauteur, rayon) {
     `Q${x + largeur},${y} ${x + largeur},${y + r}V${y + hauteur}Z`;
 }
 
-// Segments disjoints d'une barre, de la base vers le haut : retenues,
-// sélectionnées non retenues, puis (si `mesures` les contient) le reste des
-// uniques et les doublons de BOAMP. La barre mesure donc la plus large des
-// étapes montrées. Les annonces évaluées par l'équipe sont affichées même non
-// sélectionnées : le segment des sélectionnées ne descend pas sous zéro.
+// Segments disjoints d'une barre, de la base vers le haut : pertinentes (si
+// `mesures` les contient), retenues non pertinentes, sélectionnées non
+// retenues, puis (si `mesures` les contient) le reste des uniques et les
+// doublons de BOAMP. La barre mesure donc la plus large des étapes montrées.
+// Les annonces évaluées par l'équipe sont affichées même non sélectionnées :
+// le segment des sélectionnées ne descend pas sous zéro.
 function segments(valeurs, mesures) {
+  const pertinentes = mesures.includes(MESURES[4]) ? Math.min(valeurs.pertinentes, valeurs.affichees) : 0;
   const retenues = valeurs.affichees;
   const selection = Math.max(valeurs.analysees_llm - retenues, 0);
   const uniques = Math.max(valeurs.recuperees - retenues - selection, 0);
   return [
-    { mesure: MESURES[3], n: retenues },
+    { mesure: MESURES[4], n: pertinentes },
+    { mesure: MESURES[3], n: retenues - pertinentes },
     { mesure: MESURES[2], n: selection },
     { mesure: MESURES[1], n: uniques },
     { mesure: MESURES[0], n: Math.max(valeurs.avant_dedoublonnage - retenues - selection - uniques, 0) },
@@ -1164,9 +1169,9 @@ const hauteurBarre = (valeurs, mesures) => segments(valeurs, mesures).reduce((so
 const MARGES = { haut: 10, droite: 24, bas: 24, gauche: 40 };
 const HAUTEUR_GRAPHIQUE = 190;
 
-// mesures : étapes montrées (MESURES, ou MESURES_TOTAL) ; le titre compte la
-// plus large sur la période.
-function graphique(titre, jours, donnees, largeur, mesures = MESURES) {
+// mesures : étapes montrées (MESURES_SOURCE, ou MESURES_TOTAL) ; le titre
+// compte la plus large sur la période.
+function graphique(titre, jours, donnees, largeur, mesures = MESURES_SOURCE) {
   const large = mesures[0];
   const total = donnees.reduce((somme, v) => somme + v[large.cle], 0);
   const carte = el("div", { className: "graphique" }, [
