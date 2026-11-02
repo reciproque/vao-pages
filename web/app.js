@@ -1042,26 +1042,28 @@ function afficherVeille() {
 // --- Onglet « Statistiques » ------------------------------------------------
 // Vue statistiques_quotidiennes (sql/schema_supabase.sql du dépôt de la
 // pipeline) : par source et par jour de publication, annonces collectées
-// (enregistrées en base), sélectionnées (rapporte, envoyées au LLM) et
-// retenues (affichées, même règle que la page). Un graphique en barres
-// empilées pour l'ensemble des sources (sélectionnées et retenues seulement),
-// puis un par source (les trois étapes) ; les chiffres de l'ensemble des
-// sources sont dans un tableau, entre le premier graphique et les autres.
+// (doublons de BOAMP compris), uniques (enregistrées en base), sélectionnées
+// (rapporte, envoyées au LLM) et retenues (affichées, même règle que la page).
+// Un graphique en barres empilées pour l'ensemble des sources (sélectionnées
+// et retenues seulement), puis un par source (les quatre étapes) ; les
+// chiffres de l'ensemble des sources sont dans un tableau, entre le premier
+// graphique et les autres.
 
 const VUE_STATISTIQUES = "statistiques_quotidiennes";
 const JOURS_STATISTIQUES = 20;
 // Étapes emboîtées, de la plus large à la plus étroite. Rampe d'un seul brun
-// « cacao », du caramel au chocolat (validée : ordre de clarté, écarts
-// visibles, contraste du plus clair sur fond blanc). La légende est construite
-// à partir de cette liste.
+// « cacao », du caramel très clair au chocolat. Le très clair (collectées)
+// est sous 2:1 sur fond blanc, par choix : l'infobulle et le tableau donnent
+// les nombres. La légende est construite à partir de cette liste.
 const MESURES = [
-  { cle: "recuperees", libelle: "Collectées", legende: "Collectées", titre: "Enregistrées en base après les filtres de collecte", couleur: "#d4a373" },
+  { cle: "avant_dedoublonnage", libelle: "Collectées", legende: "Collectées (doublons compris)", titre: "Collectées après les filtres de collecte, doublons de BOAMP compris (TED, SafeTender, PLACE, AWS)", couleur: "#e8cba6" },
+  { cle: "recuperees", libelle: "Uniques", legende: "Uniques (sans les doublons de BOAMP)", titre: "Enregistrées en base : collectées sans les doublons de BOAMP", couleur: "#d4a373" },
   { cle: "analysees_llm", libelle: "Sélectionnées", legende: "Sélectionnées (envoyées au LLM)", titre: "Retenues par le seuil de score, envoyées au LLM", couleur: "#9a5b2e" },
   { cle: "affichees", libelle: "Retenues", legende: "Retenues (affichées)", titre: "Visibles dans l'onglet Appels d'offres", couleur: "#4a2511" },
 ];
-// Graphique « Toutes sources » : sans les collectées, qui écraseraient le reste.
-const MESURES_TOTAL = MESURES.slice(1);
-// Colonnes du tableau des chiffres : les trois étapes, plus les annonces notées
+// Graphique « Toutes sources » : sans les collectées ni les uniques, qui écraseraient le reste.
+const MESURES_TOTAL = MESURES.slice(2);
+// Colonnes du tableau des chiffres : les quatre étapes, plus les annonces notées
 // « pertinent » par l'équipe (pas dans les graphiques).
 const COLONNES_CHIFFRES = [
   ...MESURES,
@@ -1142,16 +1144,18 @@ function barreArrondie(x, y, largeur, hauteur, rayon) {
 
 // Segments disjoints d'une barre, de la base vers le haut : retenues,
 // sélectionnées non retenues, puis (si `mesures` les contient) le reste des
-// collectées. La barre mesure donc la plus large des étapes montrées. Les
-// annonces évaluées par l'équipe sont affichées même non sélectionnées : le
-// segment du milieu ne descend pas sous zéro.
+// uniques et les doublons de BOAMP. La barre mesure donc la plus large des
+// étapes montrées. Les annonces évaluées par l'équipe sont affichées même non
+// sélectionnées : le segment des sélectionnées ne descend pas sous zéro.
 function segments(valeurs, mesures) {
   const retenues = valeurs.affichees;
   const selection = Math.max(valeurs.analysees_llm - retenues, 0);
+  const uniques = Math.max(valeurs.recuperees - retenues - selection, 0);
   return [
-    { mesure: MESURES[2], n: retenues },
-    { mesure: MESURES[1], n: selection },
-    { mesure: MESURES[0], n: Math.max(valeurs.recuperees - retenues - selection, 0) },
+    { mesure: MESURES[3], n: retenues },
+    { mesure: MESURES[2], n: selection },
+    { mesure: MESURES[1], n: uniques },
+    { mesure: MESURES[0], n: Math.max(valeurs.avant_dedoublonnage - retenues - selection - uniques, 0) },
   ].filter((segment) => mesures.includes(segment.mesure));
 }
 
@@ -1265,13 +1269,15 @@ function pourcentage(n, total) {
 }
 
 // Ratios de chaque ligne (colonne « Ratio ») : rien pour les collectées,
-// sélectionnées / collectées, retenues / collectées et / sélectionnées,
-// pertinentes / collectées et / retenues. [numérateur, dénominateur, précision].
+// uniques / collectées, sélectionnées / uniques, retenues / uniques et /
+// sélectionnées, pertinentes / uniques et / retenues. [numérateur,
+// dénominateur, précision].
 const RATIOS = {
-  recuperees: [],
-  analysees_llm: [["analysees_llm", "recuperees", "des coll."]],
-  affichees: [["affichees", "recuperees", "des coll."], ["affichees", "analysees_llm", "des sél."]],
-  pertinentes: [["pertinentes", "recuperees", "des coll."], ["pertinentes", "affichees", "des ret."]],
+  avant_dedoublonnage: [],
+  recuperees: [["recuperees", "avant_dedoublonnage", "des coll."]],
+  analysees_llm: [["analysees_llm", "recuperees", "des uniq."]],
+  affichees: [["affichees", "recuperees", "des uniq."], ["affichees", "analysees_llm", "des sél."]],
+  pertinentes: [["pertinentes", "recuperees", "des uniq."], ["pertinentes", "affichees", "des ret."]],
 };
 
 // Tableau des chiffres, toutes sources réunies : une ligne par mesure
