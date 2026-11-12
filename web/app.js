@@ -119,39 +119,13 @@ function nomPays(code) {
   return PAYS_ALPHA2[code] ? NOMS_PAYS.of(PAYS_ALPHA2[code]) : code;
 }
 
+// Types d'avis TED montrés dans « Type de marché » : les avis de marché
+// ordinaires (cn-standard, cn-social) n'y figurent pas, ce n'est pas un type
+// de marché (choix de l'utilisatrice, 12/11/2026).
 const TYPES_AVIS_TED = {
-  "cn-standard": "Avis de marché",
-  "cn-social": "Avis de marché (services sociaux)",
   "cn-desg": "Concours",
   "pin-cfc-standard": "Préinformation (mise en concurrence)",
   "pin-cfc-social": "Préinformation (services sociaux)",
-};
-
-const PROCEDURES_TED = {
-  open: "Procédure ouverte",
-  restricted: "Procédure restreinte",
-  "neg-w-call": "Négociée avec mise en concurrence",
-  "neg-wo-call": "Négociée sans mise en concurrence",
-  "comp-dial": "Dialogue compétitif",
-  "comp-tend": "Procédure concurrentielle avec négociation",
-  innovation: "Partenariat d'innovation",
-  "oth-single": "Autre procédure (une étape)",
-  "oth-mult": "Autre procédure (plusieurs étapes)",
-};
-
-// --- Libellés Simap ---------------------------------------------------------
-
-const TYPES_MARCHE_SIMAP = {
-  construction: "Travaux",
-  service: "Services",
-  supply: "Fournitures",
-};
-
-const PROCEDURES_SIMAP = {
-  open: "Procédure ouverte",
-  selective: "Procédure sélective",
-  invitation: "Procédure sur invitation",
-  direct: "Procédure de gré à gré",
 };
 
 // --- Sources ----------------------------------------------------------------
@@ -164,7 +138,11 @@ const PROCEDURES_SIMAP = {
 //   objet          : objet affiché ;
 //   pays           : codes pays (ISO 3166-1 alpha-3), France pour les sources françaises ;
 //   categories     : descripteurs (BOAMP) ou libellés CPV (TED, Simap, Find a Tender), en liste ;
-//   typeMarche, procedure : lignes de la colonne « Marché » (libellé, ou vide) ;
+//   typeMarche, procedure : lignes de la colonne « Marché » (libellé, ou vide).
+//                    typeMarche : catégorie BOAMP, concours, préinformation ou
+//                    rectificatif ; jamais « Avis de marché » ni la nature
+//                    (Travaux, Fournitures, Services). procedure : libellé
+//                    harmonisé par la pipeline (traitement/procedures.py) ;
 //   departements   : codes département, pour le filtre ;
 //   description    : (facultatif) texte affiché, replié, sur une ligne sous l'annonce ;
 //   recherche      : champs explorés par la recherche libre.
@@ -199,8 +177,8 @@ const SOURCES = {
     objet: (a) => a.objet_fr || a.objet,
     pays: (a) => decouper(a.pays, ","),
     categories: (a) => decouper(a.libelles_cpv, ";"),
-    typeMarche: (a) => TYPES_AVIS_TED[a.type_avis] || a.type_avis,
-    procedure: (a) => PROCEDURES_TED[a.procedure_libelle] || a.procedure_libelle,
+    typeMarche: (a) => TYPES_AVIS_TED[a.type_avis] || null,
+    procedure: (a) => a.procedure_libelle,
     departements: aucune,
     // Description traduite pour les avis non francophones retenus, sinon l'originale
     // (avis francophones ; avis non retenus affichés pour leur évaluation par l'équipe).
@@ -232,7 +210,7 @@ const SOURCES = {
     objet: (a) => a.objet,
     pays: () => FRANCE,
     categories: aucune,
-    typeMarche: (a) => (a.rectificatif ? "Avis rectificatif" : "Avis de marché"),
+    typeMarche: (a) => (a.rectificatif ? "Avis rectificatif" : null),
     procedure: () => null,
     departements: (a) => [a.code_departement],
     // Le mail d'alerte AWS ne donne pas de description ; « Publié le » est la date du mail.
@@ -241,7 +219,7 @@ const SOURCES = {
   simap: {
     libelle: "Simap",
     table: "annonces_simap",
-    colonnes: ["objet_fr", "canton", "ville", "type_marche", "procedure_libelle", "libelles_cpv", "libelle_cpc", "description", "description_fr"],
+    colonnes: ["objet_fr", "canton", "ville", "procedure_libelle", "libelles_cpv", "libelle_cpc", "description", "description_fr"],
     // Lieu d'exécution : ville et canton.
     detailAcheteur: (a) => [a.ville, a.canton && `(${a.canton})`].filter(Boolean).join(" "),
     // Traduction automatique pour les projets non francophones, sinon l'objet d'origine.
@@ -249,8 +227,8 @@ const SOURCES = {
     pays: () => SUISSE,
     // Catégorie CPC à part : son libellé contient des « ; ».
     categories: (a) => [...decouper(a.libelles_cpv, ";"), a.libelle_cpc].filter(Boolean),
-    typeMarche: (a) => TYPES_MARCHE_SIMAP[a.type_marche] || a.type_marche,
-    procedure: (a) => PROCEDURES_SIMAP[a.procedure_libelle] || a.procedure_libelle,
+    typeMarche: () => null,
+    procedure: (a) => a.procedure_libelle,
     departements: aucune,
     // Comme TED : description traduite pour les projets non francophones retenus.
     description: (a) => a.description_fr || a.description,
@@ -259,14 +237,13 @@ const SOURCES = {
   safetender: {
     libelle: "SafeTender",
     table: "annonces_safetender",
-    colonnes: ["ville", "code_departement", "type_marche", "procedure_libelle", "description"],
+    colonnes: ["ville", "code_departement", "procedure_libelle", "description"],
     // Lieu d'exécution (à défaut, adresse de l'acheteur) : ville et département.
     detailAcheteur: (a) => [a.ville, a.code_departement && `(${a.code_departement})`].filter(Boolean).join(" "),
     objet: (a) => a.objet,
     pays: () => FRANCE,
     categories: aucune,
-    // Libellés déjà en français (pipeline).
-    typeMarche: (a) => a.type_marche,
+    typeMarche: () => null,
     procedure: (a) => a.procedure_libelle,
     departements: (a) => [a.code_departement],
     // Presque toujours vide sur SafeTender.
@@ -276,15 +253,14 @@ const SOURCES = {
   fts: {
     libelle: "Find a Tender",
     table: "annonces_fts",
-    colonnes: ["objet_fr", "ville", "regions", "type_marche", "procedure_libelle", "libelles_cpv", "description", "description_fr"],
+    colonnes: ["objet_fr", "ville", "regions", "procedure_libelle", "libelles_cpv", "description", "description_fr"],
     // Ville de l'acheteur, puis régions d'exécution (en français, pipeline).
     detailAcheteur: (a) => [a.ville, a.regions && `(${a.regions})`].filter(Boolean).join(" "),
     // Avis en anglais : traduction automatique si l'avis est proche du manifeste.
     objet: (a) => a.objet_fr || a.objet,
     pays: () => ROYAUME_UNI,
     categories: (a) => decouper(a.libelles_cpv, ";"),
-    // Libellés déjà en français (pipeline).
-    typeMarche: (a) => a.type_marche,
+    typeMarche: () => null,
     procedure: (a) => a.procedure_libelle,
     departements: aucune,
     // Comme Simap : description traduite pour les avis proches du manifeste.
