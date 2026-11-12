@@ -1,8 +1,8 @@
-# Veille appels d'offres — page de suivi (reciproque)
+# Reponse — page de suivi des appels d'offres (reciproque)
 
 Page web de suivi des appels d'offres sélectionnés chaque matin par la
-pipeline de veille de Reciproque (sources BOAMP, TED et autres). La pipeline vit dans
-un dépôt privé ; ce dépôt public ne contient que la page.
+pipeline de veille de reciproque. La pipeline vit dans un dépôt privé ; ce
+dépôt public ne contient que la page.
 
 **Page :** https://reciproque.github.io/vao-pages/
 (accès sur identifiant, comptes créés dans Supabase).
@@ -11,10 +11,20 @@ un dépôt privé ; ce dépôt public ne contient que la page.
 
 Trois fichiers, sans étape de build : [`web/index.html`](web/index.html)
 (structure), [`web/style.css`](web/style.css) (styles) et
-[`web/app.js`](web/app.js) (code). Elle lit directement les tables Supabase (un
-onglet par source) : rien n'est régénéré, les nouvelles annonces apparaissent
-dès que la pipeline a tourné.
+[`web/app.js`](web/app.js) (code). La page lit directement les tables
+Supabase : rien n'est régénéré, les nouvelles annonces apparaissent dès que
+la pipeline a tourné.
 
+Trois onglets :
+- **Appels d'offres** : un seul tableau pour toutes les sources (BOAMP, TED,
+  PLACE, AWS, Simap, SafeTender, FTS), avec une colonne « Source » ;
+- **Veille ciblée** : relevés des profils acheteurs surveillés (Dematis,
+  achatpublic, sites d'institutions), avec une case « Vue » par profil ;
+- **Statistiques** : par jour de publication, annonces collectées, uniques,
+  sélectionnées, retenues et jugées pertinentes, toutes sources réunies puis
+  pour chacune.
+
+Dans l'onglet « Appels d'offres » :
 - **Annonces affichées** : celles retenues par la pipeline (hors note LLM 0),
   plus celles déjà évaluées par l'équipe.
 - **Tri** : par défaut, date de publication la plus récente d'abord ; à date
@@ -24,18 +34,24 @@ dès que la pipeline a tourné.
   annonces sans valeur toujours en dernier).
 - **Saisie** : case « Vue » et évaluation de l'équipe (non pertinent,
   partiellement pertinent, pertinent).
-- **Filtres** : communs aux trois onglets (vues, date limite passée, date de
-  publication minimale, recherche texte), plus des filtres par colonne propres
-  à chaque onglet, dans les en-têtes : département, tags, descripteurs, type de
-  marché, procédure, note LLM, évaluation (BOAMP) ; pays, tags, libellés CPV,
-  type de marché, procédure, note LLM, évaluation (TED). Les valeurs proposées
-  viennent des annonces chargées, avec un choix « Non renseigné ». Plusieurs
-  valeurs d'un même filtre s'additionnent (OU), des filtres différents se
-  cumulent (ET). « Réinitialiser les filtres » remet à zéro les filtres et le
-  tri de colonne de l'onglet affiché.
-- **Colonnes à valeurs multiples** (jointes par la pipeline) : `descripteur_libelle`
-  et `libelles_cpv` séparés par « ; » (leurs valeurs contiennent des virgules),
-  `code_departement` et `pays` séparés par « , ».
+- **Filtres** : généraux (vues, date limite passée, date de publication
+  minimale, recherche texte), plus des filtres par colonne dans les en-têtes,
+  communs à toutes les sources : source, département, entité publique
+  (PLACE), pays, tags, nombre de
+  tags, descripteurs et libellés CPV, type de marché, procédure, note LLM,
+  évaluation. Les valeurs proposées viennent des annonces chargées, avec un
+  choix « Non renseigné ». Plusieurs valeurs d'un même filtre s'additionnent
+  (OU), des filtres différents se cumulent (ET). « Réinitialiser les filtres »
+  remet à zéro les filtres et le tri de colonne.
+- **Procédures** : libellés harmonisés par la pipeline, affichés tels quels.
+  « Type de marché » ne montre que les catégories BOAMP, les concours, les
+  préinformations et les rectificatifs.
+- **Avis étrangers** (TED, Simap, FTS) : objet et description traduits
+  automatiquement quand l'avis est proche du profil.
+- **Colonnes à valeurs multiples** (jointes par la pipeline) :
+  `descripteur_libelle` et `libelles_cpv` séparés par « ; » (leurs valeurs
+  contiennent des virgules), `code_departement`, `pays` et `regions` séparés
+  par « , ».
 
 ## Sécurité
 
@@ -51,7 +67,8 @@ privé de la pipeline.
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) déploie `web/` à
 chaque push sur `main` qui modifie ce dossier. GitHub Pages met la page en
 cache jusqu'à 10 minutes : après un déploiement, recharger avec
-Cmd + Shift + R.
+Cmd + Shift + R. Après chaque modification de `style.css` ou `app.js`,
+augmenter leur numéro de version (`?v=N`) dans `index.html`.
 
 Pour tester en local :
 
