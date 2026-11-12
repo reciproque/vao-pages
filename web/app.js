@@ -137,7 +137,7 @@ const TYPES_AVIS_TED = {
 //   detailAcheteur : ligne grise sous l'acheteur ;
 //   objet          : objet affiché ;
 //   pays           : codes pays (ISO 3166-1 alpha-3), France pour les sources françaises ;
-//   categories     : descripteurs (BOAMP) ou libellés CPV (TED, Simap, Find a Tender), en liste ;
+//   categories     : descripteurs (BOAMP) ou libellés CPV (TED, Simap, FTS), en liste ;
 //   typeMarche, procedure : lignes de la colonne « Marché » (libellé, ou vide).
 //                    typeMarche : catégorie BOAMP, concours, préinformation ou
 //                    rectificatif ; jamais « Avis de marché » ni la nature
@@ -251,7 +251,7 @@ const SOURCES = {
     recherche: (a) => [a.objet, a.nomacheteur, a.ville, a.description],
   },
   fts: {
-    libelle: "Find a Tender",
+    libelle: "FTS",
     table: "annonces_fts",
     colonnes: ["objet_fr", "ville", "regions", "procedure_libelle", "libelles_cpv", "description", "description_fr"],
     // Ville de l'acheteur, puis régions d'exécution (en français, pipeline).
