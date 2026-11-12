@@ -155,7 +155,7 @@ const PROCEDURES_SIMAP = {
 };
 
 // --- Sources ----------------------------------------------------------------
-// Les annonces des six tables sont réunies dans un seul tableau. Chaque
+// Les annonces des sept tables sont réunies dans un seul tableau. Chaque
 // source dit comment lire ses colonnes :
 //   libelle        : nom affiché dans la colonne « Source » ;
 //   table          : table Supabase lue et modifiée ;
@@ -163,7 +163,7 @@ const PROCEDURES_SIMAP = {
 //   detailAcheteur : ligne grise sous l'acheteur ;
 //   objet          : objet affiché ;
 //   pays           : codes pays (ISO 3166-1 alpha-3), France pour les sources françaises ;
-//   categories     : descripteurs (BOAMP) ou libellés CPV (TED, Simap), en liste ;
+//   categories     : descripteurs (BOAMP) ou libellés CPV (TED, Simap, Find a Tender), en liste ;
 //   typeMarche, procedure : lignes de la colonne « Marché » (libellé, ou vide) ;
 //   departements   : codes département, pour le filtre ;
 //   description    : (facultatif) texte affiché, replié, sur une ligne sous l'annonce ;
@@ -171,6 +171,7 @@ const PROCEDURES_SIMAP = {
 
 const FRANCE = ["FRA"];
 const SUISSE = ["CHE"];
+const ROYAUME_UNI = ["GBR"];
 const aucune = () => [];
 
 const SOURCES = {
@@ -271,6 +272,24 @@ const SOURCES = {
     // Presque toujours vide sur SafeTender.
     description: (a) => a.description,
     recherche: (a) => [a.objet, a.nomacheteur, a.ville, a.description],
+  },
+  fts: {
+    libelle: "Find a Tender",
+    table: "annonces_fts",
+    colonnes: ["objet_fr", "ville", "regions", "type_marche", "procedure_libelle", "libelles_cpv", "description", "description_fr"],
+    // Ville de l'acheteur, puis régions d'exécution (en français, pipeline).
+    detailAcheteur: (a) => [a.ville, a.regions && `(${a.regions})`].filter(Boolean).join(" "),
+    // Avis en anglais : traduction automatique si l'avis est proche du manifeste.
+    objet: (a) => a.objet_fr || a.objet,
+    pays: () => ROYAUME_UNI,
+    categories: (a) => decouper(a.libelles_cpv, ";"),
+    // Libellés déjà en français (pipeline).
+    typeMarche: (a) => a.type_marche,
+    procedure: (a) => a.procedure_libelle,
+    departements: aucune,
+    // Comme Simap : description traduite pour les avis proches du manifeste.
+    description: (a) => a.description_fr || a.description,
+    recherche: (a) => [a.objet, a.objet_fr, a.nomacheteur, a.ville, a.regions, a.libelles_cpv, a.description_fr || a.description],
   },
 };
 const ORDRE_SOURCES = Object.keys(SOURCES);
